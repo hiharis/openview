@@ -1,67 +1,146 @@
-# OpenView — Offline File Viewer for Android
+# OpenView: Free Offline PDF, DOCX, TXT & Code Viewer for Android
 
-OpenView is an open source, fast, clean, and sleek offline file viewer for Android. It has **no ads, no accounts, no analytics, no tracking, and no internet permission**.
+**OpenView is a free, open source, offline document viewer for Android.** It opens PDF, DOCX, TXT and source code files fast, with **no ads, no accounts, no tracking and no internet permission**.
 
-Existing free mobile file openers are cluttered with interstitial video ads, trackers, and mandatory account registrations. OpenView was created to provide a distraction-free, privacy-first reader designed for speed and stability.
+[**Download the latest APK**](https://github.com/hiharis/openview/releases/latest) | [Report a bug](https://github.com/hiharis/openview/issues) | [Source code](https://github.com/hiharis/openview)
 
----
+<p align="center">
+  <img src="docs/screenshots/home.png" width="22%" alt="OpenView home screen with recent files and format tabs">
+  <img src="docs/screenshots/pdf.png" width="22%" alt="OpenView PDF viewer with page indicator and night mode">
+  <img src="docs/screenshots/docx.png" width="22%" alt="OpenView DOCX viewer showing headings and a table">
+  <img src="docs/screenshots/code-dark.png" width="22%" alt="OpenView code viewer in dark mode with line numbers and syntax highlighting">
+</p>
 
-## ⚡ Key Highlights
-- **100% Offline & Private:** Zero `android.permission.INTERNET` declared. Files are accessed strictly via Android Storage Access Framework (SAF) and never leave your phone.
-- **No Ads & No Telemetry:** No third-party ad networks, no analytics SDKs, zero background data harvesting.
-- **Fast & Responsive:** Jetpack Compose UI built on Material 3 with asynchronous file handling using Kotlin Coroutines.
-- **Format Support (Phase 1):**
-  - **Plain text (`.txt`, `.log`, `.csv`, `.text`):** Fast background chunked streaming for 50MB+ files, BOM and UTF-8/Windows-1252 auto-detection, word wrap toggle, DataStore typography scaling, pinch zoom, and non-blocking in-file search with match navigation.
-  - **Code files (`.py`, `.java`, `.kt`, `.cpp`, `.c`, `.js`, `.html`, `.css`, `.json`, `.xml`, `.md`, etc.):** Monospace layout with left line numbers gutter, language indicator chip, lightweight regex syntax highlighting on demand, horizontal scroll, and in-file search.
-  - **PDF documents (`.pdf`):** Offline `PdfRenderer` engine with automatic seekable stream caching, LazyColumn page rendering with LRU bitmap cache, pinch-to-zoom, page counter indicator, and jump-to-page dialog.
-  - **Microsoft Word documents (`.docx`):** Pure offline parser via `ZipInputStream` and `XmlPullParser` on `word/document.xml`, extracting headings, formatted paragraphs (bold, italic, underline, strikethrough), bullet lists, and clean bordered tables.
-  - **Graceful "not supported yet" handling** for legacy `.doc` with conversion guidance.
+## Why OpenView?
 
----
+Most free file openers on mobile are full of video ads, trackers and forced sign-ups. OpenView is the opposite: a small, fast, distraction-free reader that respects your privacy. If you just want to open a PDF, a Word file or a text file on your phone, this does exactly that and nothing else.
 
-## 🛠️ Tech Stack & Architecture
+## Features
+
+- **100% offline and private.** The app declares zero `android.permission.INTERNET`. Files are opened through Android's Storage Access Framework and never leave your phone.
+- **No ads, no analytics, no telemetry.** No third-party ad networks, no tracking SDKs, no background data collection.
+- **Fast and responsive.** Jetpack Compose with Material 3, and all file loading runs off the main thread with Kotlin Coroutines.
+- **Light and dark themes** with a clean, accessible design.
+- **Recent files list** and settings stored locally on your device.
+- **Opens from anywhere.** Use "Open with" from your file manager, WhatsApp, Gmail or any app that shares documents.
+
+## Supported formats
+
+| Format | Extensions | What you get |
+|---|---|---|
+| **PDF viewer** | `.pdf` | Page rendering with Android's `PdfRenderer`, pinch zoom, double-tap zoom, jump to page, page indicator, night mode (invert colors), fit width / fit page, fast scroll bar |
+| **Word (DOCX) viewer** | `.docx` | Headings, paragraphs with bold, italic, underline and strikethrough, bullet lists, bordered tables, pinch and double-tap zoom, in-document search |
+| **Text viewer** | `.txt`, `.log`, `.csv`, `.text` | Smooth chunked loading of 50 MB+ files, automatic encoding detection (UTF-8, UTF-16, Windows-1252), word wrap toggle, font scaling, pinch zoom, in-file search |
+| **Code viewer** | `.py`, `.kt`, `.java`, `.cpp`, `.c`, `.js`, `.html`, `.css`, `.json`, `.xml`, `.md`, `.sh`, `.yml` and more | Monospace font, line numbers, syntax highlighting, horizontal scroll, in-file search |
+| **Legacy Word** | `.doc` | Friendly "not supported yet" screen with an option to open in another app |
+
+## Privacy
+
+OpenView is built so that privacy is enforced by design, not by promise:
+
+- No `INTERNET` permission in `AndroidManifest.xml`, so the app is technically unable to send your data anywhere.
+- No analytics, crash reporting or advertising libraries.
+- All dependencies are open source (Apache 2.0). See [LICENSES.md](LICENSES.md).
+
+You can check this yourself by reading the manifest or by viewing the app's permissions in Android settings.
+
+## Install
+
+1. **GitHub Releases:** download the latest signed APK from the [Releases page](https://github.com/hiharis/openview/releases/latest).
+2. **F-Droid:** submission is planned.
+
+Requires **Android 8.0 (API 26) or newer**.
+
+## Build from source
+
+```bash
+git clone https://github.com/hiharis/openview.git
+cd openview
+./gradlew assembleDebug
+```
+
+The debug APK is created at `app/build/outputs/apk/debug/`. You need JDK 17 or newer and the Android SDK (target SDK 36).
+
+## Tech stack
+
 - **Language:** Kotlin 2.2.10
-- **UI Toolkit:** Jetpack Compose with Material 3 (pure Kotlin, no XML layouts)
-- **Architecture:** MVVM with Unidirectional Data Flow (`ViewModel` + `StateFlow`)
-- **Navigation:** Navigation Compose (`NavHost`)
-- **Local Database:** Room Database with KSP (`AppDatabase`, `RecentFileDao`)
-- **Preferences:** Jetpack DataStore Preferences
-- **Minimum SDK:** 26 (Android 8.0 Oreo)
-- **Target SDK:** 36
+- **UI:** Jetpack Compose with Material 3
+- **Architecture:** MVVM with unidirectional data flow (`ViewModel` + `StateFlow`)
+- **Navigation:** Navigation Compose
+- **Database:** Room (KSP) for the recent files list and reading positions
+- **Preferences:** Jetpack DataStore
+- **PDF:** `android.graphics.pdf.PdfRenderer`
+- **DOCX:** custom parser using `ZipInputStream` and `XmlPullParser`, with no heavy libraries
+- **Min SDK:** 26 | **Target SDK:** 36
 
----
+<details>
+<summary>Project structure</summary>
 
-## 📂 Project Structure
 ```
 app/src/main/java/io/github/hiharis/openview/
-  MainActivity.kt          -> Application entry point with Edge-to-Edge and Theme setup
+  MainActivity.kt          -> App entry point, edge-to-edge, VIEW intent handling
   navigation/              -> NavGraph and Screen route definitions
-  ui/theme/                -> Color, Type, Theme, and Dimens (central design tokens)
-  ui/components/           -> Shared reusable components (OpenViewTopAppBar, FileCard, SettingsRow)
-  ui/home/                 -> Home screen and HomeViewModel
-  ui/settings/             -> Settings screen and SettingsViewModel
-  ui/about/                -> About screen with open source license credits
+  ui/theme/                -> Color, Type, Theme, Dimens (design tokens)
+  ui/components/           -> Reusable components (top bar, file card, fast scroll bar)
+  ui/home/                 -> Home screen and ViewModel
+  ui/settings/             -> Settings screen and ViewModel
+  ui/about/                -> About screen and license credits
   viewers/
-    router/                -> FileRouter (detects file type and selects viewer)
-    text/                  -> Text viewer screen and ViewModel
-    code/                  -> Code viewer screen and ViewModel
-    pdf/                   -> PDF viewer screen and ViewModel
-    docx/                  -> DOCX viewer screen and ViewModel
-    unsupported/           -> Unsupported format & legacy .doc screen
+    router/                -> FileRouter (detects file type by extension, magic bytes, MIME)
+    text/                  -> Text viewer
+    code/                  -> Code viewer
+    pdf/                   -> PDF viewer
+    docx/                  -> DOCX viewer
+    unsupported/           -> Unsupported format and legacy .doc screen
   data/
-    settings/              -> Jetpack DataStore wrapper (SettingsManager)
-    recent/                -> Room entities, DAO, AppDatabase, and repository
-  core/                    -> Core utilities (FileUtils, FileType detection, size formatting)
+    settings/              -> DataStore wrapper
+    recent/                -> Room entities, DAO, database, repository
+  core/                    -> Utilities (FileUtils, FileType, OpenFileSession)
 ```
 
----
+</details>
 
-## 👤 Author
-Created and maintained by **hiharis**
-- GitHub: [hiharis](https://github.com/hiharis)
-- Source code: [https://github.com/hiharis/openview](https://github.com/hiharis/openview)
+## Roadmap
 
----
+- [ ] Image viewer (JPG, PNG, WebP) with zoom and pan
+- [ ] Better DOCX fidelity (images, numbered lists, alignment, styles)
+- [ ] Saved reading position for every format
+- [ ] F-Droid release
 
-## 📄 License
+Have an idea? [Open an issue](https://github.com/hiharis/openview/issues).
+
+## FAQ
+
+**Is OpenView really free?**
+Yes. It is free forever, with no ads, no in-app purchases and no premium tier.
+
+**Does OpenView need internet or any permissions?**
+No. It has no internet permission and does not request storage permissions. Files are opened through the Android system file picker.
+
+**Can OpenView open .doc files?**
+Not yet. Legacy `.doc` files show a friendly message. Save the file as `.docx` or PDF and it will open.
+
+**Why does my DOCX look different from Word?**
+OpenView uses a lightweight reader focused on speed and readable content, so complex layouts (text boxes, columns, floating images) may not match Word exactly.
+
+**Is it an alternative to ad-supported PDF readers?**
+Yes. If you want an ad-free, offline PDF and document viewer for Android, that is exactly what OpenView is for.
+
+## Contributing
+
+Pull requests and bug reports are welcome. Please keep the project's core promise intact: no internet permission, no trackers, no ads.
+
+## Support the project
+
+OpenView is free and always will be. The best way to support it is to **star the repo** and **share it with friends and family**. #SupportOpenSource
+
+## Author
+
+Created and maintained by **hiharis**.
+
+- GitHub: [@hiharis](https://github.com/hiharis)
+- Source code: [github.com/hiharis/openview](https://github.com/hiharis/openview)
+
+## License
+
 Licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 hiharis.
