@@ -5,10 +5,10 @@
 [**Download the latest APK**](https://github.com/hiharis/openview/releases/latest) | [Report a bug](https://github.com/hiharis/openview/issues) | [Source code](https://github.com/hiharis/openview)
 
 <p align="center">
-  <img src="docs/screenshots/home.png" width="22%" alt="OpenView home screen with recent files and format tabs">
-  <img src="docs/screenshots/pdf.png" width="22%" alt="OpenView PDF viewer with page indicator and night mode">
-  <img src="docs/screenshots/docx.png" width="22%" alt="OpenView DOCX viewer showing headings and a table">
-  <img src="docs/screenshots/code-dark.png" width="22%" alt="OpenView code viewer in dark mode with line numbers and syntax highlighting">
+  <img src="blog/lightmodeview.jpeg" width="22%" alt="OpenView Android file viewer home screen in light mode">
+  <img src="blog/darkmodeview.jpeg" width="22%" alt="OpenView Android file viewer home screen in dark mode">
+  <img src="blog/docview.jpeg" width="22%" alt="OpenView opening a Word DOCX document on Android">
+  <img src="blog/codeview.jpeg" width="22%" alt="OpenView code viewer showing a Python file with syntax highlighting and line numbers">
 </p>
 
 ## Why OpenView?
