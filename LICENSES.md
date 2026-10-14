@@ -1,5 +1,7 @@
 # Third-Party Licenses
 
+OpenView is created by **hiharis** (GitHub: [hiharis](https://github.com/hiharis/openview)) and licensed under the Apache License 2.0. Copyright 2026 hiharis.
+
 OpenView strictly uses permissive open source libraries (Apache 2.0, MIT, BSD). No GPL, AGPL, or proprietary tracking libraries are included.
 
 ---

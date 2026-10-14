@@ -1,3 +1,6 @@
+// OpenView by hiharis
+// Author: hiharis | Repository: https://github.com/hiharis/openview
+
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 
 plugins {
@@ -9,11 +12,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "io.github.hiharis.openview"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.folio.fxqvrz"
+    applicationId = "io.github.hiharis.openview"
     minSdk = 26
     targetSdk = 36
     versionCode = 1

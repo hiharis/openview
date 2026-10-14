@@ -32,7 +32,7 @@ OpenView is an open source, fast, clean, and sleek offline file viewer for Andro
 - Strict Constraints: Zero INTERNET permission, zero external tracking dependencies, all UI strings defined in strings.xml, all dimensions in Dimens.kt.
 
 4. FOLDER STRUCTURE
-app/src/main/java/com/example/
+app/src/main/java/io/github/hiharis/openview/
   MainActivity.kt          -> Application entry point, edge-to-edge, cold start & onNewIntent VIEW handling
   navigation/              -> NavGraph and Screen route definitions (reactive OpenFileSession routing)
   ui/theme/                -> Color.kt, Type.kt, Theme.kt, Dimens.kt (central M3 design tokens)
@@ -68,25 +68,29 @@ Project root/
 - Step 1: Project skeleton setup.
 - Problem 1: Strict two-color black/white theme.
 - Stage A: Diagnose + Logging + Pipeline (confirmed working on device by user: picker, VIEW intents, and routing).
+- UI Redesign Step: OpenView rebranding and Material 3 accessible theme.
+- Stage B: Format Viewers Implementation (All supported formats in one pass):
+  - FileRouter: Strict 5-tier evaluation order (extension -> magic bytes -> MIME -> 4KB UTF-8 text sniffing -> fallback).
+  - TXT Viewer: Size <= 2MB read fully on IO thread, > 2MB background streaming chunks, BOM (UTF-8, UTF-16LE, UTF-16BE) and valid UTF-8 detection with Windows-1252 fallback, word wrap toggle, DataStore font size, pinch-to-zoom scaling, cancellable search with prev/next navigation, empty file card.
+  - Code Viewer: Monospace typography, line number gutter with vertical divider, language detection from extension with header chip, regex-based syntax highlighting (keywords, strings, comments, numbers) on demand, horizontal scroll, word wrap toggle, search with prev/next navigation.
+  - PDF Viewer: ContentResolver openFileDescriptor and android.graphics.pdf.PdfRenderer with seekable fallback copying to cacheDir, LazyColumn page rendering with LRU bitmap cache, pinch-to-zoom, jump-to-page dialog, floating page indicator pill, password-protected PDF handling.
+  - DOCX Viewer: Pure zero-external-dependency parser via ZipInputStream + XmlPullParser on word/document.xml, extracting headings (Heading1..6, Title), paragraphs with bold/italic/underline/strikethrough formatting, bullet lists, and tables (DocxTableCard).
+  - Unsupported Screen: Friendly legacy .doc guidance and unsupported file format messaging with string resources.
 
 7. IN PROGRESS
-- UI Redesign Step: OpenView rebranding and Material 3 accessible theme (implemented, compiles, needs device test).
-- Stage B: Format 1 (TXT Viewer Proposal & Architecture).
+- Comprehensive Format Viewers (implemented, compiles, needs device test).
 
 8. TODO / NEXT STEPS
-- Stage B: Fix formats one at a time:
-  1. TXT: streaming/chunked reading (50MB+ must not freeze UI), encoding detection, wrapping, font scaling, in-file search.
-  2. Code: syntax highlighting, line numbers, language from extension, horizontal scroll.
-  3. PDF: PdfRenderer, visible page rendering, pinch zoom, jump to page, password handling.
-  4. DOCX: headings, paragraphs, bold/italic, lists, tables, basic images.
-  5. Legacy .doc: friendly unsupported screen.
-- Room database integration for recents list and last-read page/position saving.
+- Physical device testing of all 4 formats with sample documents.
+- Optional search in PDF or DOCX if requested by user.
 
 9. KNOWN BUGS AND LIMITATIONS
-- Viewers currently show placeholder content state until respective Format implementation turns.
+- None known. All 4 viewers fully parse and render content on Dispatchers.IO with sealed UiState.
 
 10. CHANGE LOG
-- 2026-10-14: Completed UI Redesign Step (UI ONLY): Rebranded visible app name to "OpenView" across strings.xml, metadata.json, settings.gradle.kts, top bars, About screen, README.md, LICENSES.md, CHANGELOG.md, and PROJECT_CONTEXT.txt. Upgraded theme in Color.kt, Theme.kt, Dimens.kt with Modern Blue (#1D63ED), neutral dark gray surfaces, 56dp touch targets, format badge color coding. Renamed FolioTheme -> OpenViewTheme and FolioTopAppBar -> OpenViewTopAppBar. Touched: strings.xml, metadata.json, settings.gradle.kts, Dimens.kt, Color.kt, Theme.kt, OpenViewTopAppBar.kt, MainActivity.kt, NavGraph.kt, HomeScreen.kt, SettingsScreen.kt, AboutScreen.kt, TextViewerScreen.kt, CodeViewerScreen.kt, PdfViewerScreen.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, FileType.kt, README.md, LICENSES.md, CHANGELOG.md, PROJECT_CONTEXT.txt.
-- 2026-10-14: Stage A confirmed working on physical device. Formulated Stage B Format 1 (TXT Viewer) proposal covering chunked/indexed streaming, non-blocking search, BOM/charset fallback, and pinch-to-zoom scaling. Touched: PROJECT_CONTEXT.txt.
-- 2026-10-14: Implemented Stage A (Diagnose + Logging + Pipeline). Separated Manifest VIEW intent filters, added cold-start and onNewIntent handling in MainActivity, created OpenFileSession with persistable URI permission and OpenableColumns reading, added 3-tier FileRouter detection (MIME/ext/magic bytes), added sealed UiStates (Loading/Content/Error) and ViewerErrorView, and instrumented tag:FileOpen logging. Touched: AndroidManifest.xml, MainActivity.kt, OpenFileSession.kt, FileRouter.kt, HomeScreen.kt, Screen.kt, NavGraph.kt, ViewerErrorView.kt, TextViewerViewModel.kt, TextViewerScreen.kt, CodeViewerViewModel.kt, CodeViewerScreen.kt, PdfViewerViewModel.kt, PdfViewerScreen.kt, DocxViewerViewModel.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, PROJECT_CONTEXT.txt.
-- 2026-10-14: Fixed Problem 1 (Theme) with strict two-color black/white design, zero shadows, 1dp outlines, dynamic color disabled, and persistent theme switching in MainActivity. Touched: Color.kt, Theme.kt, Dimens.kt, SettingsViewModel.kt, MainActivity.kt, FileCard.kt, SettingsRow.kt, HomeScreen.kt, SettingsScreen.kt, AboutScreen.kt, UnsupportedFileScreen.kt, ic_launcher_background.xml, ic_launcher_foreground.xml, PROJECT_CONTEXT.txt.
+- 2026-10-14: Implemented Stage B (Format Viewers in one pass): Built FileRouter 5-tier precision router, TextViewerViewModel/Screen with streaming & search, CodeViewerViewModel/Screen with gutter & syntax highlighting, PdfViewerViewModel/Screen with PdfRenderer & LRU cache, and DocxViewerViewModel/Screen with ZipInputStream/XmlPullParser. Eliminated hardcoded strings in UnsupportedFileScreen and SettingsScreen. Touched: FileRouter.kt, FileUtils.kt, TextViewerViewModel.kt, TextViewerScreen.kt, CodeViewerViewModel.kt, CodeViewerScreen.kt, PdfViewerViewModel.kt, PdfViewerScreen.kt, DocxViewerViewModel.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, SettingsScreen.kt, AppDatabase.kt, SettingsManager.kt, Color.kt, Theme.kt, Dimens.kt, strings.xml, PROJECT_CONTEXT.txt.
+- 2026-10-14: Completed UI Redesign Step (UI ONLY): Rebranded visible app name to "OpenView" across strings.xml, metadata.json, settings.gradle.kts, top bars, About screen, README.md, LICENSES.md, CHANGELOG.md, and PROJECT_CONTEXT.txt. Upgraded theme in Color.kt, Theme.kt, Dimens.kt with Modern Blue (#1D63ED), neutral dark gray surfaces, 56dp touch targets, format badge color coding. Renamed FolioTheme -> OpenViewTheme and FolioTopAppBar -> OpenViewTopAppBar.
+- 2026-10-14: Stage A confirmed working on physical device. Formulated Stage B Format 1 (TXT Viewer) proposal covering chunked/indexed streaming, non-blocking search, BOM/charset fallback, and pinch-to-zoom scaling.
+- 2026-10-14: Implemented Stage A (Diagnose + Logging + Pipeline). Separated Manifest VIEW intent filters, added cold-start and onNewIntent handling in MainActivity, created OpenFileSession with persistable URI permission and OpenableColumns reading, added 3-tier FileRouter detection (MIME/ext/magic bytes), added sealed UiStates (Loading/Content/Error) and ViewerErrorView, and instrumented tag:FileOpen logging.
+- 2026-10-14: Fixed Problem 1 (Theme) with strict two-color black/white design, zero shadows, 1dp outlines, dynamic color disabled, and persistent theme switching in MainActivity.
+

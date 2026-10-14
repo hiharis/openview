@@ -11,11 +11,11 @@ Existing free mobile file openers are cluttered with interstitial video ads, tra
 - **No Ads & No Telemetry:** No third-party ad networks, no analytics SDKs, zero background data harvesting.
 - **Fast & Responsive:** Jetpack Compose UI built on Material 3 with asynchronous file handling using Kotlin Coroutines.
 - **Format Support (Phase 1):**
-  - Plain text (`.txt`, `.log`, `.csv`, `.tsv`)
-  - Code files (`.py`, `.java`, `.kt`, `.cpp`, `.c`, `.js`, `.ts`, `.html`, `.css`, `.json`, `.xml`, `.md`, etc.)
-  - PDF documents (`.pdf`)
-  - Microsoft Word documents (`.docx`)
-  - Graceful "not supported yet" handling for legacy `.doc`
+  - **Plain text (`.txt`, `.log`, `.csv`, `.text`):** Fast background chunked streaming for 50MB+ files, BOM and UTF-8/Windows-1252 auto-detection, word wrap toggle, DataStore typography scaling, pinch zoom, and non-blocking in-file search with match navigation.
+  - **Code files (`.py`, `.java`, `.kt`, `.cpp`, `.c`, `.js`, `.html`, `.css`, `.json`, `.xml`, `.md`, etc.):** Monospace layout with left line numbers gutter, language indicator chip, lightweight regex syntax highlighting on demand, horizontal scroll, and in-file search.
+  - **PDF documents (`.pdf`):** Offline `PdfRenderer` engine with automatic seekable stream caching, LazyColumn page rendering with LRU bitmap cache, pinch-to-zoom, page counter indicator, and jump-to-page dialog.
+  - **Microsoft Word documents (`.docx`):** Pure offline parser via `ZipInputStream` and `XmlPullParser` on `word/document.xml`, extracting headings, formatted paragraphs (bold, italic, underline, strikethrough), bullet lists, and clean bordered tables.
+  - **Graceful "not supported yet" handling** for legacy `.doc` with conversion guidance.
 
 ---
 
@@ -33,7 +33,7 @@ Existing free mobile file openers are cluttered with interstitial video ads, tra
 
 ## 📂 Project Structure
 ```
-app/src/main/java/com/example/
+app/src/main/java/io/github/hiharis/openview/
   MainActivity.kt          -> Application entry point with Edge-to-Edge and Theme setup
   navigation/              -> NavGraph and Screen route definitions
   ui/theme/                -> Color, Type, Theme, and Dimens (central design tokens)
@@ -56,5 +56,12 @@ app/src/main/java/com/example/
 
 ---
 
+## 👤 Author
+Created and maintained by **hiharis**
+- GitHub: [hiharis](https://github.com/hiharis)
+- Source code: [https://github.com/hiharis/openview](https://github.com/hiharis/openview)
+
+---
+
 ## 📄 License
-Licensed under the [Apache License, Version 2.0](LICENSES.md).
+Licensed under the [Apache License, Version 2.0](LICENSE). Copyright 2026 hiharis.
