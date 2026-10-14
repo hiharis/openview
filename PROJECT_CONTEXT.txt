@@ -1,0 +1,92 @@
+1. PROJECT OVERVIEW
+OpenView is an open source, fast, clean, and sleek offline file viewer for Android.
+- Core Promise: NO ads, NO accounts, NO analytics, NO tracking, and NO internet permission.
+- Purpose: Replace ad-ridden, slow document viewers with a stable, lightweight utility prioritizing speed over feature bloat.
+- Phase 1 Scope: Fast viewing of TXT, Code files (.py, .kt, .java, .cpp, .js, .html, .css, .json, .xml, .md), PDF (android.graphics.pdf.PdfRenderer), and DOCX (structured readable view). Legacy .doc shows a friendly "not supported yet" screen. System "Open with" intent filter, Recents list via Room, and Settings via DataStore.
+
+2. TECH STACK
+- Language: Kotlin 2.2.10 (Apache 2.0)
+- UI Toolkit: Jetpack Compose with Material 3 (BOM 2024.09.00) (Apache 2.0)
+- Navigation: androidx.navigation:navigation-compose:2.8.9 (Apache 2.0)
+- Architecture/State: androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7 (Apache 2.0)
+- Local Persistence: androidx.room (runtime/ktx/compiler 2.7.0 via KSP 2.3.5) (Apache 2.0)
+- Preferences: androidx.datastore:datastore-preferences:1.1.7 (Apache 2.0)
+- Asynchronous Runtime: kotlinx-coroutines-android:1.10.2 (Apache 2.0)
+- Minimum SDK: 26 (Android 8.0 Oreo) | Target SDK: 36 (Android 16)
+- Dependency Management: Gradle Version Catalog (libs.versions.toml)
+
+3. ARCHITECTURE
+- MVVM with Unidirectional Data Flow (UI -> Event -> ViewModel -> StateFlow -> Compose UI).
+- Layered Separation:
+  - UI Layer: Screen composables consuming ViewModel UI state with collectAsStateWithLifecycle.
+  - Reusable Components: Modular widgets in ui/components/ (OpenViewTopAppBar, FileCard, SettingsRow, ViewerErrorView).
+  - Navigation: Centralized NavGraph with sealed Screen destinations; OpenFileSession state holder avoids string URI route bugs.
+  - Data Layer: Room Database for recent files history & scroll positions; DataStore for settings preferences.
+  - Core/Router: SAF Uri abstraction, MIME & extension type inference, magic bytes sniffing, and viewer dispatching.
+- Modern Accessible Material 3 Design System:
+  - Accent Color: Modern Blue (#1D63ED / AccentBlue).
+  - Light mode: Soft off-white background (#F8F9FA), pure white cards/surfaces (#FFFFFF), dark gray text (#1E2022).
+  - Dark mode: Deep charcoal background (#121418), dark gray cards/surfaces (#1C1F26), off-white text (#F0F2F5).
+  - Geometry: Generous rounded corners (16–24dp), 56dp minimum touch targets, subtle card elevation/depth, color-coded format badges (PDF red, Word blue, Text green, Code purple).
+  - Material You / dynamic color completely disabled. All color tokens centralized in Color.kt and Theme.kt.
+- Strict Constraints: Zero INTERNET permission, zero external tracking dependencies, all UI strings defined in strings.xml, all dimensions in Dimens.kt.
+
+4. FOLDER STRUCTURE
+app/src/main/java/com/example/
+  MainActivity.kt          -> Application entry point, edge-to-edge, cold start & onNewIntent VIEW handling
+  navigation/              -> NavGraph and Screen route definitions (reactive OpenFileSession routing)
+  ui/theme/                -> Color.kt, Type.kt, Theme.kt, Dimens.kt (central M3 design tokens)
+  ui/components/           -> Shared reusable UI components (OpenViewTopAppBar, FileCard, SettingsRow, ViewerErrorView)
+  ui/home/                 -> HomeScreen and HomeViewModel (hero picker, format tabs, recent files)
+  ui/settings/             -> SettingsScreen and SettingsViewModel (theme & typography options)
+  ui/about/                -> AboutScreen (version, mission, zero-permission notice, licenses)
+  viewers/router/          -> FileRouter (maps MIME, extension, and magic bytes to specific viewers)
+  viewers/text/            -> TextViewerScreen & ViewModel (TXT reader with sealed UiState)
+  viewers/code/            -> CodeViewerScreen & ViewModel (syntax highlight viewer with sealed UiState)
+  viewers/pdf/             -> PdfViewerScreen & ViewModel (PDF rendering with sealed UiState)
+  viewers/docx/            -> DocxViewerScreen & ViewModel (DOCX parser with sealed UiState)
+  viewers/unsupported/     -> UnsupportedFileScreen (unsupported formats & legacy .doc)
+  data/settings/           -> SettingsManager (DataStore preferences wrapper)
+  data/recent/             -> Room database, entities, DAO, and repository for recent files
+  core/                    -> Utilities (FileUtils, FileType detection, OpenFileSession)
+Project root/
+  README.md                -> Public project overview, setup, and features
+  PROJECT_CONTEXT.txt      -> Single source of truth context file for multi-step pair programming
+  LICENSES.md              -> Third-party dependency licenses log (Apache 2.0 strictly)
+  CHANGELOG.md             -> Versioned chronological log of changes
+
+5. DECISIONS LOG
+- 2026-10-14: Selected name "Folio" initially, then updated to "OpenView" to provide immediate clarity as an open file viewer.
+- 2026-10-14: Minimum SDK set to 26 per specifications (covers Android 8.0+ devices without needing legacy storage hacks).
+- 2026-10-14: Omitted INTERNET permission completely from AndroidManifest.xml to enforce privacy by architecture.
+- 2026-10-14: UI Redesign: Replaced strict two-color theme with a calm, accessible Material 3 design system with confident accent Modern Blue (#1D63ED), neutral dark gray surfaces (#121418 background, #1C1F26 surface), neutral light surfaces (#F8F9FA background, #FFFFFF surface), 16–24dp corners, subtle elevation, 56dp touch targets, and format badge color coding.
+- 2026-10-14: Connected SettingsManager DataStore directly to MainActivity to apply Light/Dark/System app-wide in real-time.
+- 2026-10-14: Implemented OpenFileSession shared state holder instead of serializing content URIs into Navigation route strings, preventing route truncation and encoding bugs on complex SAF and third-party URIs.
+- 2026-10-14: Separated AndroidManifest VIEW intent filters into dedicated blocks for content://, file://, and fallback octet-stream with pathPattern.
+
+6. COMPLETED
+- Step 1: Project skeleton setup.
+- Problem 1: Strict two-color black/white theme.
+- Stage A: Diagnose + Logging + Pipeline (confirmed working on device by user: picker, VIEW intents, and routing).
+
+7. IN PROGRESS
+- UI Redesign Step: OpenView rebranding and Material 3 accessible theme (implemented, compiles, needs device test).
+- Stage B: Format 1 (TXT Viewer Proposal & Architecture).
+
+8. TODO / NEXT STEPS
+- Stage B: Fix formats one at a time:
+  1. TXT: streaming/chunked reading (50MB+ must not freeze UI), encoding detection, wrapping, font scaling, in-file search.
+  2. Code: syntax highlighting, line numbers, language from extension, horizontal scroll.
+  3. PDF: PdfRenderer, visible page rendering, pinch zoom, jump to page, password handling.
+  4. DOCX: headings, paragraphs, bold/italic, lists, tables, basic images.
+  5. Legacy .doc: friendly unsupported screen.
+- Room database integration for recents list and last-read page/position saving.
+
+9. KNOWN BUGS AND LIMITATIONS
+- Viewers currently show placeholder content state until respective Format implementation turns.
+
+10. CHANGE LOG
+- 2026-10-14: Completed UI Redesign Step (UI ONLY): Rebranded visible app name to "OpenView" across strings.xml, metadata.json, settings.gradle.kts, top bars, About screen, README.md, LICENSES.md, CHANGELOG.md, and PROJECT_CONTEXT.txt. Upgraded theme in Color.kt, Theme.kt, Dimens.kt with Modern Blue (#1D63ED), neutral dark gray surfaces, 56dp touch targets, format badge color coding. Renamed FolioTheme -> OpenViewTheme and FolioTopAppBar -> OpenViewTopAppBar. Touched: strings.xml, metadata.json, settings.gradle.kts, Dimens.kt, Color.kt, Theme.kt, OpenViewTopAppBar.kt, MainActivity.kt, NavGraph.kt, HomeScreen.kt, SettingsScreen.kt, AboutScreen.kt, TextViewerScreen.kt, CodeViewerScreen.kt, PdfViewerScreen.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, FileType.kt, README.md, LICENSES.md, CHANGELOG.md, PROJECT_CONTEXT.txt.
+- 2026-10-14: Stage A confirmed working on physical device. Formulated Stage B Format 1 (TXT Viewer) proposal covering chunked/indexed streaming, non-blocking search, BOM/charset fallback, and pinch-to-zoom scaling. Touched: PROJECT_CONTEXT.txt.
+- 2026-10-14: Implemented Stage A (Diagnose + Logging + Pipeline). Separated Manifest VIEW intent filters, added cold-start and onNewIntent handling in MainActivity, created OpenFileSession with persistable URI permission and OpenableColumns reading, added 3-tier FileRouter detection (MIME/ext/magic bytes), added sealed UiStates (Loading/Content/Error) and ViewerErrorView, and instrumented tag:FileOpen logging. Touched: AndroidManifest.xml, MainActivity.kt, OpenFileSession.kt, FileRouter.kt, HomeScreen.kt, Screen.kt, NavGraph.kt, ViewerErrorView.kt, TextViewerViewModel.kt, TextViewerScreen.kt, CodeViewerViewModel.kt, CodeViewerScreen.kt, PdfViewerViewModel.kt, PdfViewerScreen.kt, DocxViewerViewModel.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, PROJECT_CONTEXT.txt.
+- 2026-10-14: Fixed Problem 1 (Theme) with strict two-color black/white design, zero shadows, 1dp outlines, dynamic color disabled, and persistent theme switching in MainActivity. Touched: Color.kt, Theme.kt, Dimens.kt, SettingsViewModel.kt, MainActivity.kt, FileCard.kt, SettingsRow.kt, HomeScreen.kt, SettingsScreen.kt, AboutScreen.kt, UnsupportedFileScreen.kt, ic_launcher_background.xml, ic_launcher_foreground.xml, PROJECT_CONTEXT.txt.
