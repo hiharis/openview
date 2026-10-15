@@ -381,6 +381,12 @@ fun AboutScreen(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
               )
+              Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+              Text(
+                text = stringResource(id = R.string.about_permission_notice),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
             }
           }
         }

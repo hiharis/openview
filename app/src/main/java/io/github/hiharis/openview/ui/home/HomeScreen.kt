@@ -1,7 +1,11 @@
 // Copyright 2026 hiharis | Licensed under Apache 2.0 | github.com/hiharis/openview
 package io.github.hiharis.openview.ui.home
 
+import android.Manifest
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -9,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -56,18 +62,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.hiharis.openview.R
 import io.github.hiharis.openview.core.OpenFileSession
+import io.github.hiharis.openview.data.files.DeviceDocument
 import io.github.hiharis.openview.ui.components.FileCard
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.theme.Dimens
 import io.github.hiharis.openview.ui.theme.OpenViewTheme
+import java.util.Locale
 
 @Composable
 fun HomeScreen(
@@ -85,6 +98,51 @@ fun HomeScreen(
   ) { uri: Uri? ->
     if (uri != null) {
       OpenFileSession.openUri(context, uri)
+    }
+  }
+
+  val manageStorageLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.StartActivityForResult(),
+  ) {
+    viewModel.checkAndRefreshPermission()
+  }
+
+  val permissionLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestPermission(),
+  ) { isGranted ->
+    viewModel.updatePermissionStatus(isGranted)
+  }
+
+  val lifecycleOwner = LocalLifecycleOwner.current
+  DisposableEffect(lifecycleOwner) {
+    val observer = LifecycleEventObserver { _, event ->
+      if (event == Lifecycle.Event.ON_RESUME) {
+        viewModel.checkAndRefreshPermission()
+      }
+    }
+    lifecycleOwner.lifecycle.addObserver(observer)
+    onDispose {
+      lifecycleOwner.lifecycle.removeObserver(observer)
+    }
+  }
+
+  val requestStoragePermission = {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      try {
+        val intent = Intent(
+          Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+          Uri.parse("package:${context.packageName}"),
+        )
+        manageStorageLauncher.launch(intent)
+      } catch (_: Exception) {
+        try {
+          val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+          manageStorageLauncher.launch(intent)
+        } catch (_: Exception) {
+        }
+      }
+    } else {
+      permissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
   }
 
@@ -200,7 +258,10 @@ fun HomeScreen(
       ) { currentTab ->
         TabContent(
           tab = currentTab,
-          files = uiState.filteredFiles,
+          recentFiles = uiState.filteredFiles,
+          deviceDocuments = uiState.filteredDeviceDocuments,
+          isScanningDocuments = uiState.isScanningDocuments,
+          hasStoragePermission = uiState.hasStoragePermission,
           onOpenFile = {
             openDocumentLauncher.launch(
               arrayOf(
@@ -231,9 +292,13 @@ fun HomeScreen(
           onFileClick = { fileItem ->
             OpenFileSession.openUri(context, Uri.parse(fileItem.fileUri))
           },
+          onDeviceDocumentClick = { doc ->
+            OpenFileSession.openUri(context, doc.uri)
+          },
           onRemoveRecent = { fileItem ->
             viewModel.removeRecent(fileItem.id)
           },
+          onRequestPermission = requestStoragePermission,
         )
       }
     }
@@ -243,10 +308,15 @@ fun HomeScreen(
 @Composable
 private fun TabContent(
   tab: HomeTab,
-  files: List<RecentFileItem>,
+  recentFiles: List<RecentFileItem>,
+  deviceDocuments: List<DeviceDocument>,
+  isScanningDocuments: Boolean,
+  hasStoragePermission: Boolean,
   onOpenFile: () -> Unit,
   onFileClick: (RecentFileItem) -> Unit,
+  onDeviceDocumentClick: (DeviceDocument) -> Unit,
   onRemoveRecent: (RecentFileItem) -> Unit,
+  onRequestPermission: () -> Unit,
 ) {
   val title = when (tab) {
     HomeTab.ALL -> stringResource(id = R.string.home_title_all)
@@ -309,7 +379,63 @@ private fun TabContent(
       }
     }
 
-    if (files.isNotEmpty()) {
+    // Permission banner if storage access is not granted
+    if (!hasStoragePermission) {
+      item {
+        StoragePermissionBanner(
+          onRequestPermission = onRequestPermission,
+        )
+      }
+    }
+
+    // Documents in Download and Documents folders
+    if (deviceDocuments.isNotEmpty()) {
+      item {
+        Text(
+          text = stringResource(id = R.string.home_device_documents_header),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onBackground,
+          modifier = Modifier.padding(top = Dimens.spaceSmall),
+        )
+      }
+
+      items(deviceDocuments, key = { it.id }) { document ->
+        DeviceDocumentCard(
+          document = document,
+          onClick = { onDeviceDocumentClick(document) },
+        )
+      }
+    } else if (isScanningDocuments) {
+      item {
+        Card(
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("scanning_documents_card"),
+          shape = RoundedCornerShape(Dimens.cornerLarge),
+          colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+          ),
+          border = BorderStroke(Dimens.borderThin, MaterialTheme.colorScheme.outline),
+        ) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(Dimens.spaceMedium),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = stringResource(id = R.string.home_scanning_documents),
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
+      }
+    }
+
+    // Recent files section
+    if (recentFiles.isNotEmpty()) {
       item {
         Text(
           text = stringResource(id = R.string.home_recent_files_header),
@@ -320,7 +446,7 @@ private fun TabContent(
         )
       }
 
-      items(files, key = { it.id }) { fileItem ->
+      items(recentFiles, key = { it.id }) { fileItem ->
         FileCard(
           fileName = fileItem.fileName,
           fileDetails = fileItem.lastOpenedFormatted,
@@ -329,9 +455,137 @@ private fun TabContent(
           onRemoveFromRecents = { onRemoveRecent(fileItem) },
         )
       }
-    } else {
+    } else if (deviceDocuments.isEmpty() && !isScanningDocuments) {
       item {
         TabEmptyState(tab = tab)
+      }
+    }
+  }
+}
+
+@Composable
+private fun DeviceDocumentCard(
+  document: DeviceDocument,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val fileTypeColors = OpenViewTheme.fileTypeColors
+  val (icon: ImageVector, iconColor: Color, containerColor: Color) = when (document.extension.lowercase(Locale.ROOT)) {
+    "pdf" -> Triple(Icons.Default.PictureAsPdf, fileTypeColors.pdf, fileTypeColors.pdfContainer)
+    "doc", "docx", "rtf", "odt" -> Triple(Icons.Default.Description, fileTypeColors.word, fileTypeColors.wordContainer)
+    "py", "kt", "kts", "java", "cpp", "c", "h", "hpp", "js", "ts", "html", "css", "json", "xml", "md", "sh", "sql" ->
+      Triple(Icons.Default.Code, fileTypeColors.code, fileTypeColors.codeContainer)
+    else -> Triple(Icons.Default.Description, fileTypeColors.text, fileTypeColors.textContainer)
+  }
+
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Dimens.cornerLarge))
+      .clickable(onClick = onClick)
+      .testTag("device_document_card_${document.name}"),
+    shape = RoundedCornerShape(Dimens.cornerLarge),
+    border = BorderStroke(Dimens.borderThin, MaterialTheme.colorScheme.outline),
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surface,
+    ),
+    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationLow),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(
+          horizontal = Dimens.spaceMedium,
+          vertical = Dimens.spaceMedium,
+        ),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Surface(
+        shape = RoundedCornerShape(Dimens.cornerMedium),
+        color = containerColor,
+        modifier = Modifier.size(Dimens.iconTileSize),
+      ) {
+        Box(contentAlignment = Alignment.Center) {
+          Icon(
+            imageVector = icon,
+            contentDescription = document.name,
+            tint = iconColor,
+            modifier = Modifier.size(Dimens.iconSizeLarge),
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.width(Dimens.spaceMedium))
+
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = document.name,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = "${document.folderName} • ${document.formattedSize} • ${document.lastModifiedFormatted}",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          modifier = Modifier.padding(top = Dimens.spaceExtraSmall),
+        )
+      }
+    }
+  }
+}
+
+@Composable
+private fun StoragePermissionBanner(
+  onRequestPermission: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .testTag("storage_permission_banner"),
+    shape = RoundedCornerShape(Dimens.cornerLarge),
+    border = BorderStroke(Dimens.borderThin, MaterialTheme.colorScheme.outline),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(Dimens.spaceMedium),
+    ) {
+      Text(
+        text = stringResource(id = R.string.home_storage_permission_title),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Spacer(modifier = Modifier.height(Dimens.spaceExtraSmall))
+      Text(
+        text = stringResource(id = R.string.home_storage_permission_desc),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+      Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+      Button(
+        onClick = onRequestPermission,
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(Dimens.minTouchTarget)
+          .testTag("grant_storage_permission_button"),
+        shape = RoundedCornerShape(Dimens.cornerMedium),
+        colors = ButtonDefaults.buttonColors(
+          containerColor = MaterialTheme.colorScheme.primary,
+          contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+      ) {
+        Text(
+          text = stringResource(id = R.string.home_storage_permission_button),
+          fontWeight = FontWeight.Bold,
+        )
       }
     }
   }

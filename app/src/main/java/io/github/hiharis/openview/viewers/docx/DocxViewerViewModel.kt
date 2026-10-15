@@ -63,6 +63,7 @@ class DocxViewerViewModel : ViewModel() {
   }
 
   fun loadDocx(context: Context, uri: Uri, fileName: String) {
+    Log.d(TAG, "DocxViewerViewModel: start load DOCX uri=$uri, name=$fileName")
     viewModelScope.launch {
       _uiState.value = DocxUiState.Loading
 

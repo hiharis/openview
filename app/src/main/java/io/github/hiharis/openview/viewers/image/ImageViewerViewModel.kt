@@ -8,6 +8,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.hiharis.openview.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,7 @@ class ImageViewerViewModel : ViewModel() {
   }
 
   fun loadImage(context: Context, uri: Uri, fileName: String) {
+    Log.d(TAG, "ImageViewerViewModel: start load image uri=$uri, name=$fileName")
     viewModelScope.launch {
       _uiState.value = ImageUiState.Loading
       withContext(Dispatchers.IO) {
@@ -51,14 +53,16 @@ class ImageViewerViewModel : ViewModel() {
           val boundsOptions = BitmapFactory.Options().apply {
             inJustDecodeBounds = true
           }
-          context.contentResolver.openInputStream(uri)?.use { stream ->
+          val boundsStream = context.contentResolver.openInputStream(uri)
+            ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+          boundsStream.use { stream ->
             BitmapFactory.decodeStream(stream, null, boundsOptions)
-          } ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+          }
 
           val origWidth = boundsOptions.outWidth
           val origHeight = boundsOptions.outHeight
           if (origWidth <= 0 || origHeight <= 0) {
-            throw IllegalStateException("Invalid image dimensions: ${origWidth}x${origHeight}")
+            throw IllegalStateException(context.getString(R.string.viewer_error_image_corrupt))
           }
 
           // 2. Compute inSampleSize
@@ -83,6 +87,9 @@ class ImageViewerViewModel : ViewModel() {
             height = origHeight,
             fileSize = fileSize,
           )
+        } catch (oom: OutOfMemoryError) {
+          Log.e(TAG, "FileOpen: OutOfMemoryError loading image: ${oom.message}", oom)
+          _uiState.value = ImageUiState.Error(context.getString(R.string.viewer_error_image_oom))
         } catch (e: Exception) {
           Log.e(TAG, "FileOpen: error loading image: ${e.message}", e)
           _uiState.value = ImageUiState.Error(e.message ?: "Failed to load image")

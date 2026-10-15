@@ -1,11 +1,19 @@
 // Copyright 2026 hiharis | Licensed under Apache 2.0 | github.com/hiharis/openview
 package io.github.hiharis.openview.ui.home
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
 import android.text.format.DateUtils
+import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.hiharis.openview.core.FileUtils
+import io.github.hiharis.openview.data.files.DeviceDocument
+import io.github.hiharis.openview.data.files.DeviceDocumentScanner
 import io.github.hiharis.openview.data.recent.AppDatabase
 import io.github.hiharis.openview.data.recent.RecentFile
 import io.github.hiharis.openview.data.recent.RecentFileRepository
@@ -39,6 +47,10 @@ data class HomeUiState(
   val selectedTab: HomeTab = HomeTab.ALL,
   val allFiles: List<RecentFileItem> = emptyList(),
   val filteredFiles: List<RecentFileItem> = emptyList(),
+  val deviceDocuments: List<DeviceDocument> = emptyList(),
+  val filteredDeviceDocuments: List<DeviceDocument> = emptyList(),
+  val isScanningDocuments: Boolean = false,
+  val hasStoragePermission: Boolean = false,
   val isLoading: Boolean = false,
 )
 
@@ -48,23 +60,46 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
   )
 
   private val _selectedTab = MutableStateFlow(HomeTab.ALL)
+  private val _deviceDocuments = MutableStateFlow<List<DeviceDocument>>(emptyList())
+  private val _isScanning = MutableStateFlow(false)
+  private val _hasStoragePermission = MutableStateFlow(checkStoragePermission())
+
+  init {
+    if (_hasStoragePermission.value) {
+      scanDeviceDocuments()
+    }
+  }
 
   val uiState: StateFlow<HomeUiState> = combine(
     repository.allRecentFiles,
     _selectedTab,
-  ) { files, tab ->
+    _deviceDocuments,
+    _isScanning,
+    _hasStoragePermission,
+  ) { files, tab, docs, isScanning, hasPerm ->
     val items = files.map { file -> mapToItem(file) }
-    val filtered = when (tab) {
+    val filteredRecent = when (tab) {
       HomeTab.ALL -> items
       HomeTab.PDF -> items.filter { it.tab == HomeTab.PDF }
       HomeTab.WORD -> items.filter { it.tab == HomeTab.WORD }
       HomeTab.TEXT -> items.filter { it.tab == HomeTab.TEXT }
       HomeTab.CODE -> items.filter { it.tab == HomeTab.CODE }
     }
+    val filteredDocs = when (tab) {
+      HomeTab.ALL -> docs
+      HomeTab.PDF -> docs.filter { it.tab == HomeTab.PDF }
+      HomeTab.WORD -> docs.filter { it.tab == HomeTab.WORD }
+      HomeTab.TEXT -> docs.filter { it.tab == HomeTab.TEXT }
+      HomeTab.CODE -> docs.filter { it.tab == HomeTab.CODE }
+    }
     HomeUiState(
       selectedTab = tab,
       allFiles = items,
-      filteredFiles = filtered,
+      filteredFiles = filteredRecent,
+      deviceDocuments = docs,
+      filteredDeviceDocuments = filteredDocs,
+      isScanningDocuments = isScanning,
+      hasStoragePermission = hasPerm,
       isLoading = false,
     )
   }.stateIn(
@@ -72,6 +107,47 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     started = SharingStarted.WhileSubscribed(5000),
     initialValue = HomeUiState(isLoading = true),
   )
+
+  fun checkStoragePermission(): Boolean {
+    val app = getApplication<Application>()
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      Environment.isExternalStorageManager()
+    } else {
+      ContextCompat.checkSelfPermission(
+        app,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+      ) == PackageManager.PERMISSION_GRANTED
+    }
+  }
+
+  fun checkAndRefreshPermission() {
+    val granted = checkStoragePermission()
+    _hasStoragePermission.value = granted
+    if (granted && _deviceDocuments.value.isEmpty() && !_isScanning.value) {
+      scanDeviceDocuments()
+    }
+  }
+
+  fun updatePermissionStatus(granted: Boolean) {
+    _hasStoragePermission.value = granted
+    if (granted) {
+      scanDeviceDocuments()
+    }
+  }
+
+  fun scanDeviceDocuments() {
+    viewModelScope.launch {
+      _isScanning.value = true
+      try {
+        val docs = DeviceDocumentScanner.scanDocuments(getApplication())
+        _deviceDocuments.value = docs
+      } catch (e: Exception) {
+        Log.e("HomeViewModel", "Error scanning documents: ${e.message}", e)
+      } finally {
+        _isScanning.value = false
+      }
+    }
+  }
 
   fun selectTab(tab: HomeTab) {
     _selectedTab.value = tab

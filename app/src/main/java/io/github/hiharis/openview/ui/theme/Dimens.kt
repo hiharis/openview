@@ -75,4 +75,7 @@ object Dimens {
   val scrollbarThumbMinHeight: Dp = 48.dp
   val scrollbarTouchTargetWidth: Dp = 48.dp
   val scrollbarCornerRadius: Dp = 4.dp
+
+  // Device Documents
+  val deviceDocumentIconSize: Dp = 24.dp
 }

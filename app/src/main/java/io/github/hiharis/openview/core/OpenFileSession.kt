@@ -43,18 +43,18 @@ object OpenFileSession {
       _sessionState.value = OpenFileSessionState.Loading
 
       // Log scheme and authority only to avoid leaking private paths
-      Log.d(TAG, "File picked / URI received: scheme=${uri.scheme}, authority=${uri.authority}")
+      Log.d(TAG, "FileOpen: URI received: uri=$uri, scheme=${uri.scheme}, authority=${uri.authority}")
 
       // 1. Take persistable URI permission if supported by the provider
       try {
         val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
         context.contentResolver.takePersistableUriPermission(uri, takeFlags)
-        Log.d(TAG, "takePersistableUriPermission granted successfully")
+        Log.d(TAG, "FileOpen: takePersistableUriPermission result: success")
       } catch (se: SecurityException) {
         // Transient intent providers (e.g. email or chat apps) may not allow persistable grants
-        Log.d(TAG, "takePersistableUriPermission not supported by provider for this URI: ${se.message}")
+        Log.d(TAG, "FileOpen: takePersistableUriPermission result: fail (${se.javaClass.name}: ${se.message})")
       } catch (e: Exception) {
-        Log.e(TAG, "takePersistableUriPermission failed", e)
+        Log.e(TAG, "FileOpen: takePersistableUriPermission result: error (${e.javaClass.name}: ${e.message})", e)
       }
 
       // 2. Query file metadata off main thread
@@ -101,7 +101,7 @@ object OpenFileSession {
             fileName = displayName,
             mimeType = mimeType,
           )
-          Log.d(TAG, "Type detected: $fileType via method=$detectionMethod")
+          Log.d(TAG, "FileOpen: router result: $fileType via method=$detectionMethod")
 
           // Save to Room recent files database
           try {

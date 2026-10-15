@@ -112,6 +112,8 @@
     <string name="viewer_error_pdf_invalid">The PDF file is corrupted or cannot be rendered.</string>
     <string name="viewer_error_docx_invalid">This file does not appear to be a valid Word document.</string>
     <string name="viewer_error_image_invalid">Failed to decode or render image.</string>
+    <string name="viewer_error_image_corrupt">Unsupported or corrupt image</string>
+    <string name="viewer_error_image_oom">Image is too large to display.</string>
 
     <!-- Search in File -->
     <string name="action_search">Find in file</string>
@@ -158,4 +160,12 @@
     <string name="action_fit_page">Fit page</string>
     <string name="action_double_tap_zoom">Double tap to zoom</string>
     <string name="content_desc_fast_scrollbar">Fast scrollbar</string>
+
+    <!-- Device Document Discovery -->
+    <string name="home_device_documents_header">Documents on Device</string>
+    <string name="home_scanning_documents">Scanning Download &amp; Documents folders…</string>
+    <string name="home_storage_permission_title">Show documents from your device</string>
+    <string name="home_storage_permission_desc">Grant storage access to see documents in your Download and Documents folders here.</string>
+    <string name="home_storage_permission_button">Grant access</string>
+    <string name="about_permission_notice">OpenView uses storage access solely to discover and open documents in your Download and Documents folders. It has zero internet permission, zero tracking, and zero ads.</string>
 </resources>
