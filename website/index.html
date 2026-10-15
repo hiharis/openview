@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenView: Free Offline Document Viewer for Android</title>
+<meta name="description" content="Download OpenView, a free offline document viewer for Android. Open PDF, Word (DOCX), and text files. Free, offline, no ads, no sign-up, no tracking.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>OpenView</h1>
+  <p class="lead">Free, offline, no ads, no sign-up, no tracking.</p>
+
+  <a class="download" href="https://github.com/hiharis/openview/releases/latest/download/openview.apk" download>Download OpenView</a>
+  <p class="note">For Android phones. Free forever.</p>
+  <div class="warn" id="notAndroid">This app is made for Android phones. Please open this page on your Android phone to download it.</div>
+
+  <h2>How to install</h2>
+  <ol class="steps">
+    <li>
+      <strong>1. Tap download</strong>
+      <span>Tap the big download button above. If your phone warns you with "File might be harmful" or "Keep file?", tap <b>Download anyway</b> or <b>Keep</b>. That warning shows for all apps installed outside the Google Play Store.</span>
+    </li>
+    <li>
+      <strong>2. Open the file</strong>
+      <span>When the download finishes, tap <b>Open</b> in the notification, or find <b>openview.apk</b> in your phone's Downloads folder.</span>
+    </li>
+    <li>
+      <strong>3. Allow install from this source</strong>
+      <span>If your phone asks for permission, tap <b>Settings</b>, turn on <b>Allow from this source</b>, and then tap the back button.</span>
+    </li>
+    <li>
+      <strong>4. Tap Install, then Open</strong>
+      <span>Tap <b>Install</b> on the screen. Once installed, tap <b>Open</b> to start viewing your files.</span>
+    </li>
+  </ol>
+
+  <h2>Supported files</h2>
+  <ul class="formats">
+    <li><b>PDF documents</b> (.pdf)</li>
+    <li><b>Word documents</b> (.docx)</li>
+    <li><b>Text and code files</b> (.txt, .md, .py, .kt, .java, .js, .html, .css, .json, .xml)</li>
+  </ul>
+
+  <h2>Frequently asked questions</h2>
+  <details>
+    <summary>Is it safe?</summary>
+    <p>Yes. OpenView has zero internet permissions in Android, meaning it is technically impossible for the app to send your files or data anywhere. The complete source code is 100% public on GitHub for anyone to inspect.</p>
+  </details>
+  <details>
+    <summary>Does it cost anything?</summary>
+    <p>No. It is completely free, with no ads, no in-app purchases, and no paid subscriptions.</p>
+  </details>
+  <details>
+    <summary>Why not on the Play Store?</summary>
+    <p>OpenView is distributed directly so you can install it instantly without needing a Google account or trackers. An F-Droid open source repository release is also being prepared.</p>
+  </details>
+  <details>
+    <summary>Download did not start?</summary>
+    <p>If the download didn't start automatically, visit the <a href="https://github.com/hiharis/openview/releases/latest">OpenView GitHub Releases page</a>, scroll down to the <b>Assets</b> section, and tap <b>openview.apk</b>.</p>
+  </details>
+
+  <footer>
+    <p>OpenView is free and open source software.</p>
+    <nav class="footer-links" aria-label="Footer navigation">
+      <a href="https://github.com/hiharis">Developer GitHub</a>
+      <a href="https://github.com/hiharis/openview">Source Code</a>
+      <a href="https://github.com/hiharis/openview/issues">Issues &amp; Support</a>
+      <a href="mailto:hariskhan.forwork@gmail.com">Contact Developer</a>
+    </nav>
+  </footer>
+</main>
+
+<script>
+  if (!/Android/i.test(navigator.userAgent)) {
+    var notice = document.getElementById('notAndroid');
+    if (notice) { notice.style.display = 'block'; }
+  }
+</script>
+</body>
+</html>

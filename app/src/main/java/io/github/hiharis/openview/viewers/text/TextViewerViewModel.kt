@@ -201,7 +201,15 @@ class TextViewerViewModel : ViewModel() {
   fun setZoomScale(scale: Float) {
     val current = _uiState.value
     if (current is TextUiState.Content) {
-      _uiState.value = current.copy(zoomScale = scale.coerceIn(0.8f, 3.0f))
+      _uiState.value = current.copy(zoomScale = scale.coerceIn(0.5f, 4.0f))
+    }
+  }
+
+  fun toggleDoubleTapZoom() {
+    val current = _uiState.value
+    if (current is TextUiState.Content) {
+      val nextScale = if (current.zoomScale < 1.5f) 2.0f else 1.0f
+      _uiState.value = current.copy(zoomScale = nextScale)
     }
   }
 

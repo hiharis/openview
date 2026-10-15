@@ -4,8 +4,7 @@ package io.github.hiharis.openview.viewers.pdf
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -21,17 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,16 +36,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,18 +54,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.hiharis.openview.R
@@ -78,7 +70,9 @@ import io.github.hiharis.openview.core.OpenFileSessionState
 import io.github.hiharis.openview.ui.components.DraggableFastScrollBar
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.components.ViewerErrorView
+import io.github.hiharis.openview.ui.components.pinchZoom
 import io.github.hiharis.openview.ui.theme.Dimens
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -88,63 +82,55 @@ fun PdfViewerScreen(
   viewModel: PdfViewerViewModel = viewModel(),
 ) {
   val context = LocalContext.current
-  val density = LocalDensity.current
-  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val sessionState by OpenFileSession.sessionState.collectAsStateWithLifecycle()
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val pageBitmaps by viewModel.pageBitmaps.collectAsStateWithLifecycle()
-
   val listState = rememberLazyListState()
   val coroutineScope = rememberCoroutineScope()
+  val density = LocalDensity.current
+
   var showJumpDialog by remember { mutableStateOf(false) }
 
-  // Inverted color filter for night mode
-  val invertColorFilter = remember {
-    ColorFilter.colorMatrix(
-      ColorMatrix(
-        floatArrayOf(
-          -1f, 0f, 0f, 0f, 255f,
-          0f, -1f, 0f, 0f, 255f,
-          0f, 0f, -1f, 0f, 255f,
-          0f, 0f, 0f, 1f, 0f,
-        ),
-      ),
-    )
-  }
-
-  // Load PDF on ready session
   LaunchedEffect(sessionState) {
-    when (val state = sessionState) {
-      is OpenFileSessionState.Ready -> {
-        viewModel.loadPdf(
-          context = context,
-          uri = state.fileInfo.uri,
-          fileName = state.fileInfo.displayName,
-        )
-      }
-      is OpenFileSessionState.Error -> {
-        viewModel.setError(state.errorMessage)
-      }
-      else -> Unit
+    if (sessionState is OpenFileSessionState.Ready) {
+      val ready = sessionState as OpenFileSessionState.Ready
+      viewModel.loadPdf(context, ready.fileInfo.uri, ready.fileInfo.displayName)
     }
   }
 
-  // Update current page when scrolled
-  val firstVisibleIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
-  LaunchedEffect(firstVisibleIndex) {
-    viewModel.updateCurrentPage(firstVisibleIndex + 1)
+  // Update current page in ViewModel based on first visible item in LazyColumn
+  val visiblePage by remember {
+    derivedStateOf {
+      listState.firstVisibleItemIndex + 1
+    }
   }
 
-  val title = when (val state = uiState) {
-    is PdfUiState.Content -> state.fileName
-    else -> stringResource(id = R.string.viewer_title_pdf)
+  LaunchedEffect(visiblePage) {
+    viewModel.updateCurrentPage(visiblePage)
   }
 
   val isNightModeActive = (uiState as? PdfUiState.Content)?.isNightMode == true
 
+  // Invert color matrix for night mode PDF rendering
+  val invertColorFilter = remember {
+    val matrix = ColorMatrix(
+      floatArrayOf(
+        -1f, 0f, 0f, 0f, 255f,
+        0f, -1f, 0f, 0f, 255f,
+        0f, 0f, -1f, 0f, 255f,
+        0f, 0f, 0f, 1f, 0f,
+      ),
+    )
+    ColorFilter.colorMatrix(matrix)
+  }
+
   Scaffold(
     topBar = {
       OpenViewTopAppBar(
-        title = title,
+        title = when (val s = uiState) {
+          is PdfUiState.Content -> s.fileName
+          else -> stringResource(id = R.string.viewer_title_pdf)
+        },
         canNavigateBack = true,
         onNavigateUp = onNavigateUp,
         actions = {
@@ -230,44 +216,58 @@ fun PdfViewerScreen(
 
         is PdfUiState.Content -> {
           BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val viewportWidth = maxWidth
             val screenWidthPx = with(density) { maxWidth.toPx().toInt() }
             val viewportHeightDp = maxHeight - Dimens.spaceMedium
+            val hScrollState = rememberScrollState()
+            var zoomScale by remember { mutableFloatStateOf(1.0f) }
 
-            LazyColumn(
-              state = listState,
+            val isZoomed = zoomScale > 1.0f
+            val contentWidth = if (isZoomed) viewportWidth * zoomScale else viewportWidth
+
+            LaunchedEffect(zoomScale) {
+              if (zoomScale <= 1.0f) {
+                hScrollState.scrollTo(0)
+              }
+            }
+
+            Box(
               modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                  detectTapGestures(
-                    onDoubleTap = {
-                      viewModel.toggleDoubleTapZoom()
-                    },
+                .horizontalScroll(
+                  state = hScrollState,
+                  enabled = isZoomed,
+                )
+                .pinchZoom(
+                  onZoom = { zoomChange, _ ->
+                    zoomScale = (zoomScale * zoomChange).coerceIn(1.0f, 4.0f)
+                  },
+                  onDoubleTap = {
+                    zoomScale = if (zoomScale < 1.5f) 2.0f else 1.0f
+                  },
+                ),
+            ) {
+              LazyColumn(
+                state = listState,
+                modifier = Modifier
+                  .width(contentWidth)
+                  .fillMaxHeight()
+                  .padding(vertical = Dimens.spaceSmall),
+                horizontalAlignment = Alignment.CenterHorizontally,
+              ) {
+                items(count = state.totalPages, key = { it }) { pageIndex ->
+                  PdfPageItem(
+                    pageIndex = pageIndex,
+                    bitmap = pageBitmaps[pageIndex],
+                    targetWidthPx = screenWidthPx,
+                    zoomScale = zoomScale,
+                    fitMode = state.fitMode,
+                    viewportHeightDp = viewportHeightDp,
+                    colorFilter = if (state.isNightMode) invertColorFilter else null,
+                    isNightMode = state.isNightMode,
+                    onRequestBitmap = { widthPx -> viewModel.requestPageBitmap(pageIndex, widthPx) },
                   )
                 }
-                .pointerInput(Unit) {
-                  detectTransformGestures { _, _, zoom, _ ->
-                    viewModel.setZoomScale(state.zoomScale * zoom)
-                  }
-                }
-                .graphicsLayer(
-                  scaleX = state.zoomScale,
-                  scaleY = state.zoomScale,
-                  transformOrigin = TransformOrigin(0.5f, 0f),
-                )
-                .padding(vertical = Dimens.spaceSmall),
-              horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-              items(count = state.totalPages, key = { it }) { pageIndex ->
-                PdfPageItem(
-                  pageIndex = pageIndex,
-                  bitmap = pageBitmaps[pageIndex],
-                  targetWidthPx = screenWidthPx,
-                  fitMode = state.fitMode,
-                  viewportHeightDp = viewportHeightDp,
-                  colorFilter = if (state.isNightMode) invertColorFilter else null,
-                  isNightMode = state.isNightMode,
-                  onRequestBitmap = { viewModel.requestPageBitmap(pageIndex, screenWidthPx) },
-                )
               }
             }
 
@@ -336,16 +336,25 @@ private fun PdfPageItem(
   pageIndex: Int,
   bitmap: Bitmap?,
   targetWidthPx: Int,
+  zoomScale: Float,
   fitMode: PdfFitMode,
   viewportHeightDp: Dp,
   colorFilter: ColorFilter?,
   isNightMode: Boolean,
-  onRequestBitmap: () -> Unit,
+  onRequestBitmap: (Int) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  // Re-render bitmap debounced 300ms at new zoom level so it stays sharp
+  LaunchedEffect(zoomScale) {
+    delay(300)
+    val zoomedWidth = (targetWidthPx * zoomScale).toInt().coerceIn(1, 4096)
+    onRequestBitmap(zoomedWidth)
+  }
+
   LaunchedEffect(pageIndex) {
     if (bitmap == null) {
-      onRequestBitmap()
+      val initialWidth = (targetWidthPx * zoomScale).toInt().coerceIn(1, 4096)
+      onRequestBitmap(initialWidth)
     }
   }
 
@@ -376,33 +385,31 @@ private fun PdfPageItem(
     colors = CardDefaults.cardColors(containerColor = cardBg),
     elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationLow),
   ) {
-    if (bitmap != null) {
-      val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
-      Image(
-        bitmap = bitmap.asImageBitmap(),
-        contentDescription = null,
-        modifier = if (fitMode == PdfFitMode.FIT_WIDTH) {
-          Modifier
-            .fillMaxWidth()
-            .aspectRatio(aspectRatio)
-        } else {
-          Modifier.fillMaxSize()
-        },
-        contentScale = if (fitMode == PdfFitMode.FIT_WIDTH) ContentScale.FillWidth else ContentScale.Fit,
-        colorFilter = colorFilter,
-      )
-    } else {
-      Box(
-        modifier = Modifier
-          .fillMaxWidth()
-          .aspectRatio(1f / 1.414f)
-          .background(if (isNightMode) Color(0xFF262626) else MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
-      ) {
-        CircularProgressIndicator(
-          modifier = Modifier.size(Dimens.iconSizeLarge),
-          color = MaterialTheme.colorScheme.primary,
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(cardBg),
+      contentAlignment = Alignment.Center,
+    ) {
+      if (bitmap != null) {
+        Image(
+          bitmap = bitmap.asImageBitmap(),
+          contentDescription = null,
+          colorFilter = colorFilter,
+          modifier = Modifier.fillMaxWidth(),
         )
+      } else {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(Dimens.heroIconSize * 3),
+          contentAlignment = Alignment.Center,
+        ) {
+          CircularProgressIndicator(
+            modifier = Modifier.size(Dimens.iconSizeMedium),
+            color = MaterialTheme.colorScheme.primary,
+          )
+        }
       }
     }
   }
@@ -415,70 +422,60 @@ private fun JumpToPageDialog(
   onDismiss: () -> Unit,
   onPageSelected: (Int) -> Unit,
 ) {
-  var pageInputText by remember { mutableStateOf(currentPage.toString()) }
-  val pageNum = pageInputText.toIntOrNull()
-  val isValid = pageNum != null && pageNum in 1..totalPages
+  var textInput by remember { mutableStateOf(currentPage.toString()) }
 
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = {
-      Text(
-        text = stringResource(id = R.string.dialog_jump_title),
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-      )
-    },
-    text = {
-      Column {
+  Dialog(onDismissRequest = onDismiss) {
+    Card(
+      shape = RoundedCornerShape(Dimens.cornerLarge),
+      modifier = Modifier
+        .width(Dimens.jumpDialogWidth)
+        .padding(Dimens.spaceMedium),
+      colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+      Column(
+        modifier = Modifier.padding(Dimens.spaceLarge),
+        horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        Text(
+          text = stringResource(id = R.string.action_jump_to_page),
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+
+        Spacer(modifier = Modifier.height(Dimens.spaceMedium))
+
         OutlinedTextField(
-          value = pageInputText,
-          onValueChange = { pageInputText = it.filter { ch -> ch.isDigit() } },
-          label = {
-            Text(stringResource(id = R.string.dialog_jump_hint, totalPages))
-          },
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          keyboardActions = KeyboardActions(
-            onDone = {
-              if (isValid && pageNum != null) {
-                onPageSelected(pageNum)
-              }
-            },
-          ),
+          value = textInput,
+          onValueChange = { textInput = it.filter { ch -> ch.isDigit() } },
+          label = { Text(stringResource(id = R.string.pdf_page_counter, currentPage, totalPages)) },
           singleLine = true,
-          isError = pageInputText.isNotEmpty() && !isValid,
-          colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-          ),
           modifier = Modifier
             .fillMaxWidth()
             .testTag("pdf_jump_input"),
         )
-      }
-    },
-    confirmButton = {
-      Button(
-        onClick = {
-          if (isValid && pageNum != null) {
-            onPageSelected(pageNum)
+
+        Spacer(modifier = Modifier.height(Dimens.spaceLarge))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.End,
+        ) {
+          TextButton(onClick = onDismiss) {
+            Text(stringResource(id = R.string.action_close))
           }
-        },
-        enabled = isValid,
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-        modifier = Modifier.testTag("pdf_jump_confirm"),
-      ) {
-        Text(stringResource(id = R.string.dialog_jump_go))
+          Spacer(modifier = Modifier.width(Dimens.spaceSmall))
+          Button(
+            onClick = {
+              val pageNum = textInput.toIntOrNull() ?: currentPage
+              onPageSelected(pageNum.coerceIn(1, totalPages))
+            },
+            modifier = Modifier.testTag("pdf_jump_submit"),
+          ) {
+            Text(stringResource(id = R.string.action_open))
+          }
+        }
       }
-    },
-    dismissButton = {
-      TextButton(
-        onClick = onDismiss,
-        modifier = Modifier.testTag("pdf_jump_cancel"),
-      ) {
-        Text(stringResource(id = R.string.dialog_cancel))
-      }
-    },
-    shape = RoundedCornerShape(Dimens.cornerLarge),
-    containerColor = MaterialTheme.colorScheme.surface,
-  )
+    }
+  }
 }

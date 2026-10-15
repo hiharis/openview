@@ -2,14 +2,15 @@
 package io.github.hiharis.openview.viewers.code
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +28,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WrapText
-import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,7 +48,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -67,6 +67,7 @@ import io.github.hiharis.openview.core.OpenFileSessionState
 import io.github.hiharis.openview.ui.components.DraggableFastScrollBar
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.components.ViewerErrorView
+import io.github.hiharis.openview.ui.components.pinchZoom
 import io.github.hiharis.openview.ui.theme.Dimens
 import io.github.hiharis.openview.ui.theme.OpenViewTheme
 import io.github.hiharis.openview.ui.theme.SyntaxColors
@@ -78,49 +79,47 @@ fun CodeViewerScreen(
   viewModel: CodeViewerViewModel = viewModel(),
 ) {
   val context = LocalContext.current
-  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val sessionState by OpenFileSession.sessionState.collectAsStateWithLifecycle()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   val listState = rememberLazyListState()
 
   LaunchedEffect(sessionState) {
-    when (val state = sessionState) {
-      is OpenFileSessionState.Ready -> {
-        viewModel.loadFile(
-          context = context,
-          uri = state.fileInfo.uri,
-          fileName = state.fileInfo.displayName,
-          sizeBytes = state.fileInfo.sizeBytes,
-        )
-      }
-      is OpenFileSessionState.Error -> {
-        viewModel.setError(state.errorMessage)
-      }
-      else -> Unit
+    if (sessionState is OpenFileSessionState.Ready) {
+      val ready = sessionState as OpenFileSessionState.Ready
+      viewModel.loadFile(context, ready.fileInfo.uri, ready.fileInfo.displayName, ready.fileInfo.sizeBytes)
     }
-  }
-
-  val currentContent = uiState as? CodeUiState.Content
-  LaunchedEffect(currentContent?.currentMatchIndex) {
-    val content = currentContent ?: return@LaunchedEffect
-    if (content.currentMatchIndex in content.searchMatches.indices) {
-      val match = content.searchMatches[content.currentMatchIndex]
-      listState.animateScrollToItem(match.lineIndex)
-    }
-  }
-
-  val title = when (val state = uiState) {
-    is CodeUiState.Content -> state.fileName
-    else -> stringResource(id = R.string.viewer_title_code)
   }
 
   Scaffold(
     topBar = {
       OpenViewTopAppBar(
-        title = title,
+        title = when (val s = state) {
+          is CodeUiState.Content -> s.fileName
+          else -> stringResource(id = R.string.viewer_title_code)
+        },
         canNavigateBack = true,
         onNavigateUp = onNavigateUp,
         actions = {
-          if (uiState is CodeUiState.Content) {
+          if (state is CodeUiState.Content) {
+            val contentState = state as CodeUiState.Content
+            IconButton(
+              onClick = { viewModel.toggleWordWrap() },
+              modifier = Modifier
+                .size(Dimens.minTouchTarget)
+                .testTag("code_action_word_wrap"),
+            ) {
+              Icon(
+                imageVector = Icons.Default.WrapText,
+                contentDescription = stringResource(id = R.string.action_wrap_text),
+                tint = if (contentState.wordWrap) {
+                  MaterialTheme.colorScheme.primary
+                } else {
+                  MaterialTheme.colorScheme.onBackground
+                },
+                modifier = Modifier.size(Dimens.iconSizeMedium),
+              )
+            }
+
             IconButton(
               onClick = { viewModel.toggleSearch() },
               modifier = Modifier
@@ -130,20 +129,7 @@ fun CodeViewerScreen(
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = stringResource(id = R.string.action_search),
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-              )
-            }
-            IconButton(
-              onClick = { viewModel.toggleWordWrap() },
-              modifier = Modifier
-                .size(Dimens.minTouchTarget)
-                .testTag("code_action_wrap"),
-            ) {
-              Icon(
-                imageVector = Icons.Default.WrapText,
-                contentDescription = stringResource(id = R.string.action_wrap_text),
-                tint = if (currentContent?.wordWrap == true) {
+                tint = if (contentState.isSearchOpen) {
                   MaterialTheme.colorScheme.primary
                 } else {
                   MaterialTheme.colorScheme.onBackground
@@ -163,7 +149,7 @@ fun CodeViewerScreen(
         .fillMaxSize()
         .padding(innerPadding),
     ) {
-      when (val state = uiState) {
+      when (val state = state) {
         is CodeUiState.Loading -> {
           Box(
             modifier = Modifier.fillMaxSize(),
@@ -178,7 +164,6 @@ fun CodeViewerScreen(
 
         is CodeUiState.Content -> {
           Column(modifier = Modifier.fillMaxSize()) {
-            // Search Bar
             if (state.isSearchOpen) {
               CodeSearchBar(
                 query = state.searchQuery,
@@ -190,13 +175,6 @@ fun CodeViewerScreen(
                 onCloseSearch = { viewModel.toggleSearch() },
               )
             }
-
-            // Language & File Meta Bar
-            CodeInfoBar(
-              language = state.language,
-              lineCount = state.totalLines,
-              encoding = state.encoding,
-            )
 
             if (state.isEmpty) {
               Box(
@@ -220,7 +198,7 @@ fun CodeViewerScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                   ) {
                     Icon(
-                      imageVector = Icons.Outlined.Code,
+                      imageVector = Icons.Outlined.Description,
                       contentDescription = null,
                       tint = MaterialTheme.colorScheme.onSurfaceVariant,
                       modifier = Modifier.size(Dimens.heroIconSize),
@@ -237,7 +215,14 @@ fun CodeViewerScreen(
               }
             } else {
               var zoomFactor by remember { mutableFloatStateOf(1.0f) }
-              val effectiveFontSizeSp = (state.fontSizeSp * state.zoomScale * zoomFactor).coerceIn(11f, 32f)
+
+              LaunchedEffect(zoomFactor) {
+                val index = listState.firstVisibleItemIndex
+                val offset = listState.firstVisibleItemScrollOffset
+                listState.scrollToItem(index, offset)
+              }
+
+              val effectiveFontSizeSp = (state.fontSizeSp * zoomFactor).coerceIn(8f, 48f)
               val syntaxColors = OpenViewTheme.syntaxColors
               val currentMatchLine = if (state.currentMatchIndex in state.searchMatches.indices) {
                 state.searchMatches[state.currentMatchIndex].lineIndex
@@ -253,11 +238,14 @@ fun CodeViewerScreen(
                   state = listState,
                   modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                      detectTransformGestures { _, _, zoom, _ ->
-                        zoomFactor = (zoomFactor * zoom).coerceIn(0.8f, 2.5f)
-                      }
-                    },
+                    .pinchZoom(
+                      onZoom = { zoomChange, _ ->
+                        zoomFactor = (zoomFactor * zoomChange).coerceIn(0.5f, 4.0f)
+                      },
+                      onDoubleTap = {
+                        zoomFactor = if (zoomFactor < 1.5f) 2.0f else 1.0f
+                      },
+                    ),
                 ) {
                   itemsIndexed(state.lines, key = { index, _ -> index }) { lineIndex, lineText ->
                     Row(
@@ -366,50 +354,7 @@ fun CodeViewerScreen(
 }
 
 @Composable
-private fun CodeInfoBar(
-  language: String,
-  lineCount: Int,
-  encoding: String,
-  modifier: Modifier = Modifier,
-) {
-  Surface(
-    color = MaterialTheme.colorScheme.surfaceVariant,
-    modifier = modifier.fillMaxWidth(),
-  ) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.badgePaddingVertical),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-      Surface(
-        shape = RoundedCornerShape(Dimens.cornerSmall),
-        color = MaterialTheme.colorScheme.primaryContainer,
-      ) {
-        Text(
-          text = language,
-          style = MaterialTheme.typography.labelMedium,
-          fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.onPrimaryContainer,
-          modifier = Modifier.padding(
-            horizontal = Dimens.badgePaddingHorizontal,
-            vertical = Dimens.badgePaddingVertical,
-          ),
-        )
-      }
-
-      Text(
-        text = stringResource(id = R.string.file_meta_info, language, encoding, lineCount),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
-  }
-}
-
-@Composable
-private fun CodeSearchBar(
+fun CodeSearchBar(
   query: String,
   onQueryChange: (String) -> Unit,
   matchCount: Int,
@@ -513,17 +458,6 @@ private fun CodeSearchBar(
   }
 }
 
-private val KEYWORDS_REGEX = Regex(
-  "\\b(fun|val|var|class|interface|object|enum|def|import|package|from|return|" +
-    "if|else|for|while|do|break|continue|when|switch|case|try|catch|finally|throw|" +
-    "new|public|private|protected|internal|static|final|override|abstract|const|" +
-    "let|async|await|yield|function|typeof|null|true|false|nil|None|self|this|" +
-    "super|struct|typedef|include|define)\\b"
-)
-private val STRING_LITERAL_REGEX = Regex("\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'")
-private val COMMENT_REGEX = Regex("//.*|/\\*[\\s\\S]*?\\*/|#.*")
-private val NUMBER_REGEX = Regex("\\b\\d+(\\.\\d+)?([fFdDlL])?\\b|0x[0-9a-fA-F]+")
-
 private fun highlightCodeLine(
   lineText: String,
   lineIndex: Int,
@@ -536,43 +470,48 @@ private fun highlightCodeLine(
   return buildAnnotatedString {
     append(lineText)
 
-    // Numbers
-    NUMBER_REGEX.findAll(lineText).forEach { match ->
-      addStyle(
-        SpanStyle(color = syntaxColors.number),
-        match.range.first,
-        match.range.last + 1,
-      )
-    }
+    val trimmed = lineText.trim()
+    val isComment = trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("/*") || trimmed.startsWith("*")
+    val isString = (trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
 
-    // Keywords
-    KEYWORDS_REGEX.findAll(lineText).forEach { match ->
+    if (isComment) {
       addStyle(
-        SpanStyle(color = syntaxColors.keyword, fontWeight = FontWeight.Bold),
-        match.range.first,
-        match.range.last + 1,
+        SpanStyle(color = syntaxColors.comment, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+        0,
+        lineText.length,
       )
-    }
-
-    // Strings
-    STRING_LITERAL_REGEX.findAll(lineText).forEach { match ->
+    } else if (isString) {
       addStyle(
         SpanStyle(color = syntaxColors.string),
-        match.range.first,
-        match.range.last + 1,
+        0,
+        lineText.length,
       )
+    } else {
+      val words = lineText.split(Regex("(?=[\\s\\p{P}])|(?<=[\\s\\p{P}])"))
+      var currentIndex = 0
+      for (word in words) {
+        val nextIndex = currentIndex + word.length
+        if (isKeyword(word)) {
+          if (currentIndex < lineText.length && nextIndex <= lineText.length) {
+            addStyle(
+              SpanStyle(color = syntaxColors.keyword, fontWeight = FontWeight.Bold),
+              currentIndex,
+              nextIndex,
+            )
+          }
+        } else if (word.toIntOrNull() != null || word.toDoubleOrNull() != null) {
+          if (currentIndex < lineText.length && nextIndex <= lineText.length) {
+            addStyle(
+              SpanStyle(color = syntaxColors.number),
+              currentIndex,
+              nextIndex,
+            )
+          }
+        }
+        currentIndex = nextIndex
+      }
     }
 
-    // Comments override syntax
-    COMMENT_REGEX.findAll(lineText).forEach { match ->
-      addStyle(
-        SpanStyle(color = syntaxColors.comment),
-        match.range.first,
-        match.range.last + 1,
-      )
-    }
-
-    // Search matches on top
     if (searchQuery.isNotBlank() && lineText.contains(searchQuery, ignoreCase = true)) {
       val lowerLine = lineText.lowercase()
       val lowerQuery = searchQuery.lowercase()
@@ -586,15 +525,25 @@ private fun highlightCodeLine(
           searchMatches[currentMatchIndex].charIndex == found
 
         addStyle(
-          SpanStyle(
+          style = SpanStyle(
             background = if (isCurrent) syntaxColors.searchHighlightCurrent else syntaxColors.searchHighlight,
             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
           ),
-          found,
-          found + searchQuery.length,
+          start = found,
+          end = found + searchQuery.length,
         )
         start = found + searchQuery.length
       }
     }
   }
 }
+
+private val KEYWORDS = setOf(
+  "val", "var", "fun", "class", "object", "package", "import", "return", "if", "else",
+  "when", "for", "while", "do", "break", "continue", "null", "true", "false", "this", "super",
+  "def", "import", "from", "as", "class", "try", "except", "finally", "with", "lambda", "yield",
+  "public", "private", "protected", "static", "final", "void", "int", "boolean", "float", "double",
+  "const", "let", "function", "async", "await", "export", "default", "type", "struct", "enum",
+)
+
+private fun isKeyword(word: String): Boolean = word in KEYWORDS

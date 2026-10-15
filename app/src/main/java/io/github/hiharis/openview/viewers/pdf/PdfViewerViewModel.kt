@@ -59,11 +59,19 @@ class PdfViewerViewModel : ViewModel() {
   private val bitmapCache = object : LruCache<Int, Bitmap>(16) {
     override fun entryRemoved(evicted: Boolean, key: Int?, oldValue: Bitmap?, newValue: Bitmap?) {
       super.entryRemoved(evicted, key, oldValue, newValue)
+      if (evicted && oldValue != null && oldValue != newValue) {
+        try {
+          if (!oldValue.isRecycled) {
+            oldValue.recycle()
+          }
+        } catch (_: Exception) {}
+      }
     }
   }
 
   companion object {
     private const val TAG = "FileOpen"
+    private const val MAX_BITMAP_WIDTH = 4096
   }
 
   fun loadPdf(context: Context, uri: Uri, fileName: String) {
@@ -89,7 +97,6 @@ class PdfViewerViewModel : ViewModel() {
               Log.d(TAG, "PdfViewerViewModel: PdfRenderer initialized directly from ContentResolver PFD")
             }
           } catch (ioe: IOException) {
-            // Non-seekable descriptor or pipe, copy to cacheDir
             Log.d(TAG, "PdfViewerViewModel: direct PFD not seekable (${ioe.message}), copying stream to cache")
             pfd?.close()
             pfd = null
@@ -156,13 +163,22 @@ class PdfViewerViewModel : ViewModel() {
     }
   }
 
-  fun requestPageBitmap(pageIndex: Int, targetWidthPx: Int = 1080) {
+  fun requestPageBitmap(pageIndex: Int, targetWidthPx: Int = 1080, forceRefresh: Boolean = false) {
+    val clampedTargetWidth = targetWidthPx.coerceIn(1, MAX_BITMAP_WIDTH)
+    if (forceRefresh) {
+      bitmapCache.remove(pageIndex)?.let {
+        if (!it.isRecycled) try { it.recycle() } catch (_: Exception) {}
+      }
+    }
     val cached = bitmapCache.get(pageIndex)
-    if (cached != null) {
+    if (cached != null && !forceRefresh) {
       if (_pageBitmaps.value[pageIndex] != cached) {
         _pageBitmaps.value = _pageBitmaps.value + (pageIndex to cached)
       }
-      return
+      val diff = kotlin.math.abs(cached.width - clampedTargetWidth)
+      if (diff <= clampedTargetWidth * 0.05f) {
+        return
+      }
     }
 
     viewModelScope.launch(Dispatchers.IO) {
@@ -176,18 +192,31 @@ class PdfViewerViewModel : ViewModel() {
           try {
             val pageWidth = page.width
             val pageHeight = page.height
-            val scale = (targetWidthPx.toFloat() / pageWidth).coerceIn(1.0f, 3.5f)
-            val w = (pageWidth * scale).toInt().coerceAtLeast(1)
+            val scale = (clampedTargetWidth.toFloat() / pageWidth).coerceIn(0.5f, 8.0f)
+            val w = (pageWidth * scale).toInt().coerceIn(1, MAX_BITMAP_WIDTH)
             val h = (pageHeight * scale).toInt().coerceAtLeast(1)
 
-            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bmp)
-            canvas.drawColor(Color.WHITE)
-            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            val bmp = try {
+              Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            } catch (oom: OutOfMemoryError) {
+              Log.e(TAG, "PdfViewerViewModel: OutOfMemoryError creating bitmap ${w}x${h}", oom)
+              System.gc()
+              null
+            }
+
+            if (bmp != null) {
+              val canvas = Canvas(bmp)
+              canvas.drawColor(Color.WHITE)
+              page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            }
             bmp
           } finally {
             page.close()
           }
+        } catch (oom: OutOfMemoryError) {
+          Log.e(TAG, "PdfViewerViewModel: OutOfMemoryError rendering page $pageIndex", oom)
+          System.gc()
+          null
         } catch (e: Exception) {
           Log.e(TAG, "PdfViewerViewModel: failed to render page $pageIndex", e)
           null

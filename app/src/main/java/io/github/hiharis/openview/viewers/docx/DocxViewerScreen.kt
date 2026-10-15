@@ -3,8 +3,9 @@ package io.github.hiharis.openview.viewers.docx
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,18 +43,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -65,6 +67,7 @@ import io.github.hiharis.openview.core.OpenFileSessionState
 import io.github.hiharis.openview.ui.components.DraggableFastScrollBar
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.components.ViewerErrorView
+import io.github.hiharis.openview.ui.components.pinchZoom
 import io.github.hiharis.openview.ui.theme.Dimens
 import io.github.hiharis.openview.ui.theme.OpenViewTheme
 
@@ -75,50 +78,29 @@ fun DocxViewerScreen(
   viewModel: DocxViewerViewModel = viewModel(),
 ) {
   val context = LocalContext.current
-  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val sessionState by OpenFileSession.sessionState.collectAsStateWithLifecycle()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   val listState = rememberLazyListState()
 
   LaunchedEffect(sessionState) {
-    when (val state = sessionState) {
-      is OpenFileSessionState.Ready -> {
-        viewModel.loadDocx(
-          context = context,
-          uri = state.fileInfo.uri,
-          fileName = state.fileInfo.displayName,
-        )
-      }
-      is OpenFileSessionState.Error -> {
-        viewModel.setError(state.errorMessage)
-      }
-      else -> Unit
+    if (sessionState is OpenFileSessionState.Ready) {
+      val ready = sessionState as OpenFileSessionState.Ready
+      viewModel.loadDocx(context, ready.fileInfo.uri, ready.fileInfo.displayName)
     }
-  }
-
-  val currentContent = uiState as? DocxUiState.Content
-
-  // Scroll to active search match
-  LaunchedEffect(currentContent?.currentMatchIndex, currentContent?.searchMatches) {
-    val content = currentContent ?: return@LaunchedEffect
-    if (content.searchMatches.isNotEmpty() && content.currentMatchIndex in content.searchMatches.indices) {
-      val match = content.searchMatches[content.currentMatchIndex]
-      listState.animateScrollToItem(match.elementIndex)
-    }
-  }
-
-  val title = when (val state = uiState) {
-    is DocxUiState.Content -> state.fileName
-    else -> stringResource(id = R.string.viewer_title_docx)
   }
 
   Scaffold(
     topBar = {
       OpenViewTopAppBar(
-        title = title,
+        title = when (val s = state) {
+          is DocxUiState.Content -> s.fileName
+          else -> stringResource(id = R.string.viewer_title_docx)
+        },
         canNavigateBack = true,
         onNavigateUp = onNavigateUp,
         actions = {
-          if (uiState is DocxUiState.Content) {
+          if (state is DocxUiState.Content) {
+            val contentState = state as DocxUiState.Content
             IconButton(
               onClick = { viewModel.toggleSearch() },
               modifier = Modifier
@@ -128,7 +110,11 @@ fun DocxViewerScreen(
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = stringResource(id = R.string.action_search),
-                tint = MaterialTheme.colorScheme.onBackground,
+                tint = if (contentState.isSearchOpen) {
+                  MaterialTheme.colorScheme.primary
+                } else {
+                  MaterialTheme.colorScheme.onBackground
+                },
                 modifier = Modifier.size(Dimens.iconSizeMedium),
               )
             }
@@ -144,7 +130,7 @@ fun DocxViewerScreen(
         .fillMaxSize()
         .padding(innerPadding),
     ) {
-      when (val state = uiState) {
+      when (val state = state) {
         is DocxUiState.Loading -> {
           Box(
             modifier = Modifier.fillMaxSize(),
@@ -209,6 +195,14 @@ fun DocxViewerScreen(
                 }
               }
             } else {
+              var zoomFactor by remember { mutableFloatStateOf(1.0f) }
+
+              LaunchedEffect(zoomFactor) {
+                val index = listState.firstVisibleItemIndex
+                val offset = listState.firstVisibleItemScrollOffset
+                listState.scrollToItem(index, offset)
+              }
+
               val syntaxColors = OpenViewTheme.syntaxColors
               val currentMatch = if (state.searchMatches.isNotEmpty() && state.currentMatchIndex in state.searchMatches.indices) {
                 state.searchMatches[state.currentMatchIndex]
@@ -221,32 +215,29 @@ fun DocxViewerScreen(
                   state = listState,
                   modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                      detectTapGestures(
-                        onDoubleTap = {
-                          viewModel.toggleDoubleTapZoom()
-                        },
-                      )
-                    }
-                    .pointerInput(Unit) {
-                      detectTransformGestures { _, _, zoom, _ ->
-                        viewModel.setZoomScale(state.zoomScale * zoom)
-                      }
-                    }
-                    .graphicsLayer(
-                      scaleX = state.zoomScale,
-                      scaleY = state.zoomScale,
-                      transformOrigin = TransformOrigin(0.5f, 0f),
+                    .pinchZoom(
+                      onZoom = { zoomChange, _ ->
+                        zoomFactor = (zoomFactor * zoomChange).coerceIn(0.5f, 4.0f)
+                      },
+                      onDoubleTap = {
+                        zoomFactor = if (zoomFactor < 1.5f) 2.0f else 1.0f
+                      },
                     )
                     .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
                 ) {
                   itemsIndexed(state.elements, key = { index, _ -> index }) { index, element ->
                     when (element) {
                       is DocxElement.Heading -> {
-                        val (fontSizeSp, topSpacing) = when (element.level) {
-                          1 -> 24.sp to Dimens.heading1Spacing
-                          2 -> 20.sp to Dimens.heading2Spacing
-                          else -> 18.sp to Dimens.heading3Spacing
+                        val baseFontSize = when (element.level) {
+                          1 -> 24f
+                          2 -> 20f
+                          else -> 18f
+                        }
+                        val fontSizeSp = (baseFontSize * zoomFactor).sp
+                        val topSpacing = when (element.level) {
+                          1 -> Dimens.heading1Spacing
+                          2 -> Dimens.heading2Spacing
+                          else -> Dimens.heading3Spacing
                         }
                         val highlighted = highlightText(
                           text = element.text,
@@ -278,8 +269,8 @@ fun DocxViewerScreen(
                         )
                         Text(
                           text = highlighted,
-                          fontSize = 16.sp,
-                          lineHeight = 24.sp,
+                          fontSize = (16f * zoomFactor).sp,
+                          lineHeight = (24f * zoomFactor).sp,
                           color = MaterialTheme.colorScheme.onBackground,
                           modifier = Modifier
                             .fillMaxWidth()
@@ -304,15 +295,15 @@ fun DocxViewerScreen(
                         ) {
                           Text(
                             text = "•",
-                            fontSize = 18.sp,
+                            fontSize = (18f * zoomFactor).sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = Dimens.spaceSmall),
                           )
                           Text(
                             text = highlighted,
-                            fontSize = 16.sp,
-                            lineHeight = 24.sp,
+                            fontSize = (16f * zoomFactor).sp,
+                            lineHeight = (24f * zoomFactor).sp,
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.weight(1f),
                           )
@@ -327,6 +318,7 @@ fun DocxViewerScreen(
                           currentMatch = currentMatch,
                           highlightColor = syntaxColors.searchHighlight,
                           currentHighlightColor = syntaxColors.searchHighlightCurrent,
+                          zoomFactor = zoomFactor,
                         )
                       }
                     }
@@ -349,6 +341,86 @@ fun DocxViewerScreen(
             errorMessage = state.message,
             onNavigateUp = onNavigateUp,
           )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun DocxTableCard(
+  table: DocxElement.Table,
+  elementIndex: Int,
+  searchQuery: String,
+  currentMatch: DocxSearchMatch?,
+  highlightColor: Color,
+  currentHighlightColor: Color,
+  zoomFactor: Float,
+  modifier: Modifier = Modifier,
+) {
+  Card(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(vertical = Dimens.tableSpacing)
+      .testTag("docx_table_card"),
+    shape = RoundedCornerShape(Dimens.tableCornerRadius),
+    border = BorderStroke(Dimens.tableBorderWidth, MaterialTheme.colorScheme.outline),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationLow),
+  ) {
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .horizontalScroll(rememberScrollState()),
+    ) {
+      Column(modifier = Modifier.padding(Dimens.tableCellPadding)) {
+        table.rows.forEachIndexed { rowIndex, row ->
+          val isHeaderRow = rowIndex == 0
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .background(
+                if (isHeaderRow) {
+                  MaterialTheme.colorScheme.surfaceVariant
+                } else {
+                  MaterialTheme.colorScheme.surface
+                },
+              )
+              .padding(vertical = Dimens.spaceSmall),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            row.forEach { cellText ->
+              val highlighted = highlightAnnotatedText(
+                annotatedText = cellText,
+                elementIndex = elementIndex,
+                query = searchQuery,
+                currentMatch = currentMatch,
+                highlightColor = highlightColor,
+                currentHighlightColor = currentHighlightColor,
+              )
+              Box(
+                modifier = Modifier
+                  .width((Dimens.jumpDialogWidth / 2) * zoomFactor)
+                  .padding(Dimens.tableCellPadding),
+              ) {
+                Text(
+                  text = highlighted,
+                  fontSize = (14f * zoomFactor).sp,
+                  fontWeight = if (isHeaderRow) FontWeight.Bold else FontWeight.Normal,
+                  color = MaterialTheme.colorScheme.onSurface,
+                )
+              }
+            }
+          }
+
+          if (rowIndex < table.rows.size - 1) {
+            Box(
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(Dimens.dividerThickness)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+          }
         }
       }
     }
@@ -446,85 +518,6 @@ private fun DocxSearchBar(
           contentDescription = stringResource(id = R.string.action_search_close),
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-      }
-    }
-  }
-}
-
-@Composable
-private fun DocxTableCard(
-  table: DocxElement.Table,
-  elementIndex: Int,
-  searchQuery: String,
-  currentMatch: DocxSearchMatch?,
-  highlightColor: Color,
-  currentHighlightColor: Color,
-  modifier: Modifier = Modifier,
-) {
-  Card(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(vertical = Dimens.tableSpacing)
-      .testTag("docx_table_card"),
-    shape = RoundedCornerShape(Dimens.tableCornerRadius),
-    border = BorderStroke(Dimens.tableBorderWidth, MaterialTheme.colorScheme.outline),
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationLow),
-  ) {
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .horizontalScroll(rememberScrollState()),
-    ) {
-      Column(modifier = Modifier.padding(Dimens.tableCellPadding)) {
-        table.rows.forEachIndexed { rowIndex, row ->
-          val isHeaderRow = rowIndex == 0
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .background(
-                if (isHeaderRow) {
-                  MaterialTheme.colorScheme.surfaceVariant
-                } else {
-                  MaterialTheme.colorScheme.surface
-                },
-              )
-              .padding(vertical = Dimens.spaceSmall),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            row.forEach { cellText ->
-              val highlighted = highlightAnnotatedText(
-                annotatedText = cellText,
-                elementIndex = elementIndex,
-                query = searchQuery,
-                currentMatch = currentMatch,
-                highlightColor = highlightColor,
-                currentHighlightColor = currentHighlightColor,
-              )
-              Box(
-                modifier = Modifier
-                  .width(Dimens.jumpDialogWidth / 2)
-                  .padding(Dimens.tableCellPadding),
-              ) {
-                Text(
-                  text = highlighted,
-                  fontSize = 14.sp,
-                  fontWeight = if (isHeaderRow) FontWeight.Bold else FontWeight.Normal,
-                  color = MaterialTheme.colorScheme.onSurface,
-                )
-              }
-            }
-          }
-
-          if (rowIndex < table.rows.size - 1) {
-            Box(
-              modifier = Modifier
-                .fillMaxWidth()
-                .height(Dimens.dividerThickness)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-          }
-        }
       }
     }
   }

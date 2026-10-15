@@ -2,7 +2,9 @@
 package io.github.hiharis.openview.viewers.text
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,6 +66,7 @@ import io.github.hiharis.openview.core.OpenFileSessionState
 import io.github.hiharis.openview.ui.components.DraggableFastScrollBar
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.components.ViewerErrorView
+import io.github.hiharis.openview.ui.components.pinchZoom
 import io.github.hiharis.openview.ui.theme.Dimens
 import io.github.hiharis.openview.ui.theme.OpenViewTheme
 
@@ -74,51 +77,47 @@ fun TextViewerScreen(
   viewModel: TextViewerViewModel = viewModel(),
 ) {
   val context = LocalContext.current
-  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val sessionState by OpenFileSession.sessionState.collectAsStateWithLifecycle()
+  val state by viewModel.uiState.collectAsStateWithLifecycle()
   val listState = rememberLazyListState()
 
-  // Load content when session is ready
   LaunchedEffect(sessionState) {
-    when (val state = sessionState) {
-      is OpenFileSessionState.Ready -> {
-        viewModel.loadFile(
-          context = context,
-          uri = state.fileInfo.uri,
-          fileName = state.fileInfo.displayName,
-          sizeBytes = state.fileInfo.sizeBytes,
-        )
-      }
-      is OpenFileSessionState.Error -> {
-        viewModel.setError(state.errorMessage)
-      }
-      else -> Unit
+    if (sessionState is OpenFileSessionState.Ready) {
+      val ready = sessionState as OpenFileSessionState.Ready
+      viewModel.loadFile(context, ready.fileInfo.uri, ready.fileInfo.displayName, ready.fileInfo.sizeBytes)
     }
-  }
-
-  // Scroll to current search match
-  val currentContent = uiState as? TextUiState.Content
-  LaunchedEffect(currentContent?.currentMatchIndex) {
-    val content = currentContent ?: return@LaunchedEffect
-    if (content.currentMatchIndex in content.searchMatches.indices) {
-      val match = content.searchMatches[content.currentMatchIndex]
-      listState.animateScrollToItem(match.lineIndex)
-    }
-  }
-
-  val title = when (val state = uiState) {
-    is TextUiState.Content -> state.fileName
-    else -> stringResource(id = R.string.viewer_title_text)
   }
 
   Scaffold(
     topBar = {
       OpenViewTopAppBar(
-        title = title,
+        title = when (val s = state) {
+          is TextUiState.Content -> s.fileName
+          else -> stringResource(id = R.string.viewer_title_text)
+        },
         canNavigateBack = true,
         onNavigateUp = onNavigateUp,
         actions = {
-          if (uiState is TextUiState.Content) {
+          if (state is TextUiState.Content) {
+            val contentState = state as TextUiState.Content
+            IconButton(
+              onClick = { viewModel.toggleWordWrap() },
+              modifier = Modifier
+                .size(Dimens.minTouchTarget)
+                .testTag("text_action_word_wrap"),
+            ) {
+              Icon(
+                imageVector = Icons.Default.WrapText,
+                contentDescription = stringResource(id = R.string.action_wrap_text),
+                tint = if (contentState.wordWrap) {
+                  MaterialTheme.colorScheme.primary
+                } else {
+                  MaterialTheme.colorScheme.onBackground
+                },
+                modifier = Modifier.size(Dimens.iconSizeMedium),
+              )
+            }
+
             IconButton(
               onClick = { viewModel.toggleSearch() },
               modifier = Modifier
@@ -128,20 +127,7 @@ fun TextViewerScreen(
               Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = stringResource(id = R.string.action_search),
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(Dimens.iconSizeMedium),
-              )
-            }
-            IconButton(
-              onClick = { viewModel.toggleWordWrap() },
-              modifier = Modifier
-                .size(Dimens.minTouchTarget)
-                .testTag("text_action_wrap"),
-            ) {
-              Icon(
-                imageVector = Icons.Default.WrapText,
-                contentDescription = stringResource(id = R.string.action_wrap_text),
-                tint = if (currentContent?.wordWrap == true) {
+                tint = if (contentState.isSearchOpen) {
                   MaterialTheme.colorScheme.primary
                 } else {
                   MaterialTheme.colorScheme.onBackground
@@ -161,7 +147,7 @@ fun TextViewerScreen(
         .fillMaxSize()
         .padding(innerPadding),
     ) {
-      when (val state = uiState) {
+      when (val state = state) {
         is TextUiState.Loading -> {
           Box(
             modifier = Modifier.fillMaxSize(),
@@ -176,7 +162,6 @@ fun TextViewerScreen(
 
         is TextUiState.Content -> {
           Column(modifier = Modifier.fillMaxSize()) {
-            // Search Bar if open
             if (state.isSearchOpen) {
               TextSearchBar(
                 query = state.searchQuery,
@@ -227,9 +212,15 @@ fun TextViewerScreen(
                 }
               }
             } else {
-              // Pinch-to-zoom state
               var zoomFactor by remember { mutableFloatStateOf(1.0f) }
-              val effectiveFontSizeSp = (state.fontSizeSp * state.zoomScale * zoomFactor).coerceIn(12f, 36f)
+
+              LaunchedEffect(zoomFactor) {
+                val index = listState.firstVisibleItemIndex
+                val offset = listState.firstVisibleItemScrollOffset
+                listState.scrollToItem(index, offset)
+              }
+
+              val effectiveFontSizeSp = (state.fontSizeSp * zoomFactor).coerceIn(8f, 48f)
               val syntaxColors = OpenViewTheme.syntaxColors
               val currentMatchLine = if (state.currentMatchIndex in state.searchMatches.indices) {
                 state.searchMatches[state.currentMatchIndex].lineIndex
@@ -249,11 +240,14 @@ fun TextViewerScreen(
                 LazyColumn(
                   state = listState,
                   modifier = contentModifier
-                    .pointerInput(Unit) {
-                      detectTransformGestures { _, _, zoom, _ ->
-                        zoomFactor = (zoomFactor * zoom).coerceIn(0.8f, 2.5f)
-                      }
-                    }
+                    .pinchZoom(
+                      onZoom = { zoomChange, _ ->
+                        zoomFactor = (zoomFactor * zoomChange).coerceIn(0.5f, 4.0f)
+                      },
+                      onDoubleTap = {
+                        zoomFactor = if (zoomFactor < 1.5f) 2.0f else 1.0f
+                      },
+                    )
                     .padding(horizontal = Dimens.spaceMedium, vertical = Dimens.spaceSmall),
                 ) {
                   itemsIndexed(state.lines, key = { index, _ -> index }) { lineIndex, lineText ->
