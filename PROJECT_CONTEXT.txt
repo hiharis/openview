@@ -86,7 +86,7 @@ Project root/
   PROJECT_CONTEXT.txt        -> Single source of truth context file for multi-step pair programming
   LICENSES.md                -> Third-party dependency licenses log (Apache 2.0 strictly)
   CHANGELOG.md               -> Versioned chronological log of changes
-  website/                   -> Static download website (index.html, style.css, vercel.json rewrite proxy; hosted on Vercel)
+  website/                   -> Static download website (index.html, style.css, vercel.json, api/download.js; hosted on Vercel)
 
 5. DECISIONS LOG
 - 2026-10-14: Selected name "Folio" initially, then updated to "OpenView" to provide immediate clarity as an open file viewer.
@@ -108,7 +108,7 @@ Project root/
   - Code Viewer: Replaced static 56dp gutter width with dynamic text measurement via `rememberTextMeasurer()`. Digit width dynamically adapts to the file's line count digits (24–28dp for typical files instead of 56dp) and scales with pinch-zoom font size. Replaced segmented divider Box with a continuous `drawBehind` vertical separator.
   - PDF Viewer: Resolved right-drift during pinch-to-zoom by anchoring zoom to pinch centroid/screen center and synchronizing `hScrollState` via `panFraction`. In `PdfFitMode.FIT_PAGE`, multiplied `viewportHeightDp * zoomScale` and set `ContentScale.FillWidth` so pages stay centered and scale symmetrically without jumping to the right.
 - 2026-10-15: 4-Theme Design System & Updated Settings Privacy Notice: Expanded themes to 4 distinct modes: Light (Modern Blue/White), Dark (Charcoal/Blue), Red & White (Crimson #D32F2F on pure white), and Forest (Emerald #10B981 on deep pine #0D1914). Replaced the 3-card row with an accessible 2x2 grid of preview cards in SettingsScreen. Updated Settings privacy badge to accurately state that Internet access is strictly restricted to checking for app updates, with zero ads, trackers, or accounts.
-- 2026-10-15: Same-Origin APK Download Proxy on Vercel: Resolved mobile browser Custom Tab download hang where cross-origin links to GitHub release assets ignored the HTML download attribute. Added website/vercel.json with a reverse-proxy rewrite from same-origin /openview.apk to GitHub releases latest download, setting Content-Disposition: attachment, Content-Type: application/vnd.android.package-archive, and Cache-Control headers. Updated website/index.html download button to /openview.apk, ensuring tapping Download triggers Android's native download manager without opening a Custom Tab or in-page navigation.
+- 2026-10-15: Streaming proxy for APK delivery: the plain Vercel rewrite to GitHub still exposed the GitHub redirect to mobile browsers, so /openview.apk now rewrites to a Node function that fetches the latest release asset server-side and streams it with Content-Disposition: attachment, forcing the native download manager.
 
 6. COMPLETED FEATURES & MILESTONES
 - Core Viewing Engine:
@@ -141,6 +141,7 @@ Project root/
 
 8. TODO / NEXT STEPS
 - Deploy website/ to Vercel with Root Directory set to "website".
+- Verify download on phones: Chrome, Brave, Samsung Internet, Firefox.
 - Physical device testing with very large PDF and DOCX files.
 - Monitor low-RAM device memory consumption during prolonged rapid pinch-zoom sessions.
 
@@ -149,7 +150,7 @@ Project root/
 - Storage Access Framework (SAF) Recents permission: Content URIs received from some third-party file managers without persistable grant flags cannot be reopened after app restart; user can re-open via the file picker.
 
 10. CHANGE LOG
-- 2026-10-15: Configured Vercel same-origin reverse-proxy rewrite for APK downloads in website/vercel.json and updated download button in website/index.html to /openview.apk with download attribute. Fixed mobile browser Custom Tab hang, ensuring mobile Chrome and in-app browsers directly trigger Android's native system download manager notification. Touched: website/vercel.json, website/index.html, PROJECT_CONTEXT.txt.
+- 2026-10-15: Streaming proxy for APK delivery: created website/api/download.js serverless function and updated website/vercel.json rewrite to /api/download to stream the GitHub release APK with Content-Disposition: attachment without client redirects. Touched: website/api/download.js, website/vercel.json, PROJECT_CONTEXT.txt.
 - 2026-10-15: Added 4 themes (Light, Dark, Red & White, Forest) and updated Settings privacy badge to clarify that Internet access is strictly used only for app updates. Touched: strings.xml, Color.kt, Theme.kt, SettingsViewModel.kt, SettingsScreen.kt, MainActivity.kt, PROJECT_CONTEXT.txt.
 - 2026-10-15: Fixed Code Viewer line number gutter width and PDF zoom behavior. Made line gutter dynamically measured via `rememberTextMeasurer` based on digit count (reduced from fixed 56dp down to ~28dp) with continuous vertical divider. Fixed PDF zoom right-drift by synchronizing horizontal scroll state with zoom expansion centered around gesture centroid, scaling page heights in FIT_PAGE mode, and ensuring smooth non-drifting zoom animation. Touched: CodeViewerScreen.kt, PdfViewerScreen.kt, PROJECT_CONTEXT.txt.
 - 2026-10-15: Documented cryptographic release signing key integration, GitHub Secrets configuration, and the two-tier anti-fake-update security model (SHA-256 pre-verification + Android OS cryptographic signature enforcement) in PROJECT_CONTEXT.txt. Touched: PROJECT_CONTEXT.txt.
