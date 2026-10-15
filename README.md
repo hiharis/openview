@@ -2,7 +2,7 @@
 
 **OpenView is a free, open source, offline document viewer for Android.** It opens PDF, DOCX, TXT and source code files fast, with **no ads, no accounts, no tracking and no internet permission**.
 
-[**Download the latest APK**](https://github.com/hiharis/openview/releases/latest) | [Report a bug](https://github.com/hiharis/openview/issues) | [Source code](https://github.com/hiharis/openview) | [Email me](mailto:hariskhan.forwork@gmail.com?subject=OpenView%20feedback)
+[**Download the latest APK**](https://openview-website.vercel.app/) | [Report a bug](https://github.com/hiharis/openview/issues) | [Source code](https://github.com/hiharis/openview) | [Email me](mailto:hariskhan.forwork@gmail.com?subject=OpenView%20feedback)
 
 <p align="center">
   <img src="blog/lightmodeview.jpeg" width="22%" alt="OpenView Android file viewer home screen in light mode">
