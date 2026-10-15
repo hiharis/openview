@@ -34,6 +34,8 @@ object FileRouter {
     "xml", "md", "kts", "gradle", "yml", "yaml", "sh",
   )
 
+  private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "webp", "bmp")
+
   private val OLE_DOC_MAGIC = byteArrayOf(
     0xD0.toByte(), 0xCF.toByte(), 0x11.toByte(), 0xE0.toByte(),
     0xA1.toByte(), 0xB1.toByte(), 0x1A.toByte(), 0xE1.toByte(),
@@ -58,6 +60,10 @@ object FileRouter {
         CODE_EXTENSIONS.contains(ext) -> {
           Log.d(TAG, "FileRouter: matched CODE by extension .$ext")
           return Pair(FileType.CODE, "extension (.$ext)")
+        }
+        IMAGE_EXTENSIONS.contains(ext) -> {
+          Log.d(TAG, "FileRouter: matched IMAGE by extension .$ext")
+          return Pair(FileType.IMAGE, "extension (.$ext)")
         }
         ext == "pdf" -> {
           Log.d(TAG, "FileRouter: matched PDF by extension .pdf")
@@ -86,9 +92,40 @@ object FileRouter {
       Log.e(TAG, "FileRouter: failed reading magic bytes: ${e.message}", e)
     }
 
-    if (bytesRead >= 4) {
+    if (bytesRead >= 2) {
+      // JPEG: FF D8 FF
+      if (bytesRead >= 3 && header[0] == 0xFF.toByte() && header[1] == 0xD8.toByte() && header[2] == 0xFF.toByte()) {
+        Log.d(TAG, "FileRouter: matched IMAGE via magic bytes (JPEG)")
+        return Pair(FileType.IMAGE, "magic_bytes (JPEG)")
+      }
+
+      // PNG: 89 50 4E 47
+      if (bytesRead >= 4 && header[0] == 0x89.toByte() && header[1] == 0x50.toByte() &&
+        header[2] == 0x4E.toByte() && header[3] == 0x47.toByte()
+      ) {
+        Log.d(TAG, "FileRouter: matched IMAGE via magic bytes (PNG)")
+        return Pair(FileType.IMAGE, "magic_bytes (PNG)")
+      }
+
+      // WEBP: RIFF....WEBP (52 49 46 46 .... 57 45 42 50)
+      if (bytesRead >= 12 &&
+        header[0] == 0x52.toByte() && header[1] == 0x49.toByte() &&
+        header[2] == 0x46.toByte() && header[3] == 0x46.toByte() &&
+        header[8] == 0x57.toByte() && header[9] == 0x45.toByte() &&
+        header[10] == 0x42.toByte() && header[11] == 0x50.toByte()
+      ) {
+        Log.d(TAG, "FileRouter: matched IMAGE via magic bytes (WEBP)")
+        return Pair(FileType.IMAGE, "magic_bytes (WEBP)")
+      }
+
+      // BMP: BM (42 4D)
+      if (header[0] == 0x42.toByte() && header[1] == 0x4D.toByte()) {
+        Log.d(TAG, "FileRouter: matched IMAGE via magic bytes (BMP)")
+        return Pair(FileType.IMAGE, "magic_bytes (BMP)")
+      }
+
       // PDF magic bytes: %PDF (0x25, 0x50, 0x44, 0x46)
-      if (header[0] == 0x25.toByte() && header[1] == 0x50.toByte() &&
+      if (bytesRead >= 4 && header[0] == 0x25.toByte() && header[1] == 0x50.toByte() &&
         header[2] == 0x44.toByte() && header[3] == 0x46.toByte()
       ) {
         Log.d(TAG, "FileRouter: matched PDF via magic bytes (%PDF)")
@@ -110,9 +147,13 @@ object FileRouter {
       }
     }
 
-    // 3. MIME inspection (text/*)
+    // 3. MIME inspection (image/* or text/*)
     if (!mimeType.isNullOrBlank() && mimeType != "application/octet-stream" && mimeType != "*/*") {
       val normalizedMime = mimeType.lowercase(Locale.ROOT)
+      if (normalizedMime.startsWith("image/")) {
+        Log.d(TAG, "FileRouter: matched IMAGE via MIME ($mimeType)")
+        return Pair(FileType.IMAGE, "MIME ($mimeType)")
+      }
       if (normalizedMime.startsWith("text/")) {
         Log.d(TAG, "FileRouter: matched TEXT via MIME ($mimeType)")
         return Pair(FileType.TEXT, "MIME ($mimeType)")
@@ -136,8 +177,8 @@ object FileRouter {
         ZipInputStream(stream).use { zis ->
           var entry = zis.nextEntry
           var count = 0
-          while (entry != null && count < 30) {
-            val name = entry.name
+          while (entry != null && count < 100) {
+            val name = entry.name.trim().lowercase(Locale.ROOT).replace('\\', '/')
             if (name == "word/document.xml" || name.endsWith("/word/document.xml")) {
               return true
             }

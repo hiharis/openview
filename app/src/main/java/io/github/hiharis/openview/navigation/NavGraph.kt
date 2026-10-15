@@ -18,6 +18,7 @@ import io.github.hiharis.openview.ui.home.HomeScreen
 import io.github.hiharis.openview.ui.settings.SettingsScreen
 import io.github.hiharis.openview.viewers.code.CodeViewerScreen
 import io.github.hiharis.openview.viewers.docx.DocxViewerScreen
+import io.github.hiharis.openview.viewers.image.ImageViewerScreen
 import io.github.hiharis.openview.viewers.pdf.PdfViewerScreen
 import io.github.hiharis.openview.viewers.text.TextViewerScreen
 import io.github.hiharis.openview.viewers.unsupported.UnsupportedFileScreen
@@ -39,6 +40,7 @@ fun OpenViewNavGraph(
           FileType.CODE -> Screen.CodeViewer.route
           FileType.PDF -> Screen.PdfViewer.route
           FileType.DOCX -> Screen.DocxViewer.route
+          FileType.IMAGE -> Screen.ImageViewer.route
           FileType.LEGACY_DOC, FileType.UNSUPPORTED -> Screen.Unsupported.route
         }
         if (navController.currentDestination?.route != targetRoute) {
@@ -108,6 +110,15 @@ fun OpenViewNavGraph(
 
     composable(route = Screen.DocxViewer.route) {
       DocxViewerScreen(
+        onNavigateUp = {
+          OpenFileSession.reset()
+          navController.navigateUp()
+        },
+      )
+    }
+
+    composable(route = Screen.ImageViewer.route) {
+      ImageViewerScreen(
         onNavigateUp = {
           OpenFileSession.reset()
           navController.navigateUp()

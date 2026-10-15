@@ -10,5 +10,6 @@ enum class FileType {
   PDF,
   DOCX,
   LEGACY_DOC,
+  IMAGE,
   UNSUPPORTED,
 }

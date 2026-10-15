@@ -65,9 +65,16 @@ class DocxViewerViewModel : ViewModel() {
   fun loadDocx(context: Context, uri: Uri, fileName: String) {
     viewModelScope.launch {
       _uiState.value = DocxUiState.Loading
-      Log.d(TAG, "DocxViewerViewModel: start load DOCX uri=$uri, name=$fileName")
 
       withContext(Dispatchers.IO) {
+        val fileSize = try {
+          context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+        } catch (_: Exception) {
+          -1L
+        }
+        Log.d(TAG, "FileOpen: starting load DOCX uri=$uri, name=$fileName, size=$fileSize bytes")
+
+        val zipEntries = mutableListOf<String>()
         try {
           val elements = context.contentResolver.openInputStream(uri)?.use { rawStream ->
             ZipInputStream(rawStream).use { zis ->
@@ -76,10 +83,12 @@ class DocxViewerViewModel : ViewModel() {
               var parsedElements: List<DocxElement> = emptyList()
 
               while (entry != null) {
-                val name = entry.name
-                if (name == "word/document.xml" || name.endsWith("/word/document.xml")) {
+                val rawName = entry.name
+                zipEntries.add(rawName)
+                val normalizedName = rawName.trim().lowercase(java.util.Locale.ROOT).replace('\\', '/')
+                if (normalizedName == "word/document.xml" || normalizedName.endsWith("/word/document.xml")) {
                   documentXmlFound = true
-                  Log.d(TAG, "DocxViewerViewModel: found word/document.xml in zip stream")
+                  Log.d(TAG, "FileOpen: found word/document.xml in zip stream")
                   parsedElements = parseDocumentXml(zis)
                   break
                 }
@@ -95,14 +104,16 @@ class DocxViewerViewModel : ViewModel() {
             }
           }
 
+          Log.d(TAG, "FileOpen: zip entries checked (${zipEntries.size}): ${zipEntries.take(15)}")
+
           if (elements == null) {
-            Log.e(TAG, "DocxViewerViewModel: word/document.xml not found in zip")
+            Log.e(TAG, "FileOpen: word/document.xml not found in zip for uri=$uri, entries checked=${zipEntries.size}")
             _uiState.value = DocxUiState.Error("This file does not appear to be a valid Word document.")
             return@withContext
           }
 
           val isEmpty = elements.isEmpty()
-          Log.d(TAG, "DocxViewerViewModel: successfully parsed ${elements.size} elements, isEmpty=$isEmpty")
+          Log.d(TAG, "FileOpen: parsed ${elements.size} elements, isEmpty=$isEmpty for uri=$uri")
 
           _uiState.value = DocxUiState.Content(
             fileName = fileName,
@@ -112,7 +123,7 @@ class DocxViewerViewModel : ViewModel() {
         } catch (ce: CancellationException) {
           throw ce
         } catch (e: Exception) {
-          Log.e(TAG, "DocxViewerViewModel: exception parsing DOCX", e)
+          Log.e(TAG, "FileOpen: exception parsing DOCX for uri=$uri, name=$fileName", e)
           _uiState.value = DocxUiState.Error("This file does not appear to be a valid Word document.")
         }
       }
@@ -330,8 +341,20 @@ class DocxViewerViewModel : ViewModel() {
             isStrike = true
           }
           "t" -> {
-            runText += parser.nextText()
-            depth-- // nextText consumes the end tag
+            var tDepth = 1
+            while (tDepth > 0) {
+              val tEvent = parser.next()
+              if (tEvent == XmlPullParser.TEXT) {
+                runText += parser.text ?: ""
+              } else if (tEvent == XmlPullParser.START_TAG) {
+                tDepth++
+              } else if (tEvent == XmlPullParser.END_TAG) {
+                tDepth--
+              } else if (tEvent == XmlPullParser.END_DOCUMENT) {
+                break
+              }
+            }
+            depth-- // consumed "t" element end tag
           }
           "br" -> {
             runText += "\n"

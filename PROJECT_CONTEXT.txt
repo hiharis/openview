@@ -68,19 +68,19 @@ app/src/main/java/io/github/hiharis/openview/
 68: - 2026-10-15: PDF width-based zoom architecture: Replaced graphicsLayer viewport scaling on the LazyColumn with layout-level page width scaling (Box(Modifier.horizontalScroll(hScrollState).pinchZoom(...)) { LazyColumn(Modifier.width(viewportWidth * zoom)) { ... } }). Vertical scrolling remains handled by LazyColumn and horizontal panning by native horizontalScroll. Visible page bitmaps are re-rendered at target display width debounced by 300ms via LruCache with a safety cap of 4096px and OutOfMemoryError recovery.
 69: - 2026-10-15: Reflow zoom for document viewers (DOCX, TXT, CODE): Text viewers scale typography sizes, line heights, and table cells rather than viewport transforms, preserving text sharpness and native scroll stability with scroll index/offset preservation.
 70: - 2026-10-15: Static download website hosting: Vercel Root Directory = "website", so only index.html and style.css are hosted and served publicly. Zero build step, zero npm dependencies, isolating the Android app codebase from the static site.
-71: 
-72: 6. COMPLETED
-73: - Step 1: Project skeleton setup.
-74: - Problem 1: Strict two-color black/white theme.
-75: - Stage A: Diagnose + Logging + Pipeline (confirmed working on device by user: picker, VIEW intents, and routing).
-76: - UI Redesign Step: OpenView rebranding and Material 3 accessible theme.
-77: - Stage B: Format Viewers Implementation (All supported formats in one pass):
-78:   - FileRouter: Strict 5-tier evaluation order (extension -> magic bytes -> MIME -> 4KB UTF-8 text sniffing -> fallback).
-79:   - TXT Viewer: Size <= 2MB read fully on IO thread, > 2MB background streaming chunks, BOM (UTF-8, UTF-16LE, UTF-16BE) and valid UTF-8 detection with Windows-1252 fallback, word wrap toggle, DataStore font size, pinch-to-zoom scaling, cancellable search with prev/next navigation, empty file card.
-80:   - Code Viewer: Monospace typography, line number gutter with vertical divider, language detection from extension with header chip, regex-based syntax highlighting (keywords, strings, comments, numbers) on demand, horizontal scroll, word wrap toggle, search with prev/next navigation.
-81:   - PDF Viewer: ContentResolver openFileDescriptor and android.graphics.pdf.PdfRenderer with seekable fallback copying to cacheDir, LazyColumn page rendering with LRU bitmap cache, pinch-to-zoom, jump-to-page dialog, floating page indicator pill, password-protected PDF handling.
-82:   - DOCX Viewer: Pure zero-external-dependency parser via ZipInputStream + XmlPullParser on word/document.xml, extracting headings (Heading1..6, Title), paragraphs with bold/italic/underline/strikethrough formatting, bullet lists, and tables (DocxTableCard).
-83:   - Unsupported Screen: Friendly legacy .doc guidance and unsupported file format messaging with string resources.
+71: - 2026-10-15: DOCX XML Parsing and Path Normalization: Standardized ZIP entry checking with path normalization (`trim().lowercase().replace('\\', '/')`) and safe XML text reading in `parseRun` to avoid `XmlPullParserException` on child nodes/comments. Added tag:FileOpen logging for size, ZIP entries, and paragraph count.
+72: 
+73: 6. COMPLETED
+74: - Step 1: Project skeleton setup.
+75: - Problem 1: Strict two-color black/white theme.
+76: - Stage A: Diagnose + Logging + Pipeline (confirmed working on device by user: picker, VIEW intents, and routing).
+77: - UI Redesign Step: OpenView rebranding and Material 3 accessible theme.
+78: - Stage B: Format Viewers Implementation (All supported formats in one pass):
+79:   - FileRouter: Strict 5-tier evaluation order (extension -> magic bytes -> MIME -> 4KB UTF-8 text sniffing -> fallback).
+80:   - TXT Viewer: Size <= 2MB read fully on IO thread, > 2MB background streaming chunks, BOM (UTF-8, UTF-16LE, UTF-16BE) and valid UTF-8 detection with Windows-1252 fallback, word wrap toggle, DataStore font size, pinch-to-zoom scaling, cancellable search with prev/next navigation, empty file card.
+81:   - Code Viewer: Monospace typography, line number gutter with vertical divider, language detection from extension with header chip, regex-based syntax highlighting (keywords, strings, comments, numbers) on demand, horizontal scroll, word wrap toggle, search with prev/next navigation.
+82:   - PDF Viewer: ContentResolver openFileDescriptor and android.graphics.pdf.PdfRenderer with seekable fallback copying to cacheDir, LazyColumn page rendering with LRU bitmap cache, pinch-to-zoom, jump-to-page dialog, floating page indicator pill, password-protected PDF handling.
+83:   - DOCX Viewer: Pure zero-external-dependency parser via ZipInputStream + XmlPullParser on word/document.xml, extracting headings (Heading1..6, Title), paragraphs with bold/italic/underline/strikethrough formatting, bullet lists, and tables (DocxTableCard).
 84: - Zoom & Scroll Conflict Resolution (DOCX, TXT, CODE, PDF):
 85:   - Banned and eliminated detectTransformGestures across all viewers to prevent single-finger drag hijacking.
 86:   - Banned and eliminated graphicsLayer scaling on LazyColumns/scrollable lists project-wide (verified zero occurrences via grep).
@@ -91,23 +91,29 @@ app/src/main/java/io/github/hiharis/openview/
 91: - Static Download Website:
 92:   - Created website/ containing exactly two files: index.html and style.css.
 93:   - Fast, accessible static site for older/non-technical users: 20px base font, 76px+ touch download button linking to latest GitHub release APK, clear install guide, FAQ, zero tracking/analytics, and light/dark theme support.
-94: 
-95: 7. IN PROGRESS
-96: - Device verification and testing of zoom & pan interaction across all viewers.
-97: 
-98: 8. TODO / NEXT STEPS
-99: - Deploy website/ to Vercel with Root Directory set to "website".
-100: - Physical device testing with sample PDF files of varying page counts and resolutions.
-101: - Verification of memory footprint under continuous rapid zooming on lower-RAM devices.
+94: - DOCX Opening Fix:
+95:   - Diagnosed root causes: `parser.nextText()` throwing `XmlPullParserException` on child nodes/comments in `<w:t>` and un-normalized ZIP entry names (`word\document.xml`).
+96:   - Normalized ZIP entries across FileRouter and DocxViewerViewModel.
+97:   - Replaced `parser.nextText()` with safe XML text extraction loop.
+98:   - Added tag:FileOpen logging for size, checked ZIP entries, and parsed elements.
+99: 
+100: 7. IN PROGRESS
+101: - Device verification and testing of file viewing and zoom interactions across all viewers.
 102: 
-103: 9. KNOWN BUGS AND LIMITATIONS
-104: - PDF page bitmaps are capped to a max render width of 4096px to protect low-RAM devices from OutOfMemoryError. If allocation fails, the viewer catches the error and lowers the zoom cap rather than crashing.
-105: 
-106: 10. CHANGE LOG
-107: - 2026-10-15: Added static download website in website/ containing exclusively website/index.html and website/style.css. Clean, accessible layout for non-technical users with 20px base font, 76px button, install steps, FAQ, light/dark mode CSS variables, and zero external network calls. Touched: website/index.html, website/style.css, PROJECT_CONTEXT.txt.
-108: - 2026-10-15: Fixed zoom and scroll gesture conflict across viewers. Replaced detectTransformGestures and graphicsLayer list scaling with shared pinchZoom modifier and width-based PDF zoom. Handled native vertical and horizontal scrolling, focal point scroll adjustments, debounced 300ms page re-rendering up to 4096px with OOM catch, and reflow zoom for DOCX/TXT/CODE viewers. Touched: app/src/main/java/io/github/hiharis/openview/ui/components/PinchZoom.kt, app/src/main/java/io/github/hiharis/openview/viewers/pdf/PdfViewerScreen.kt, app/src/main/java/io/github/hiharis/openview/viewers/pdf/PdfViewerViewModel.kt, PROJECT_CONTEXT.txt.
-109: - 2026-10-14: Implemented Stage B (Format Viewers in one pass): Built FileRouter 5-tier precision router, TextViewerViewModel/Screen with streaming & search, CodeViewerViewModel/Screen with gutter & syntax highlighting, PdfViewerViewModel/Screen with PdfRenderer & LRU cache, and DocxViewerViewModel/Screen with ZipInputStream/XmlPullParser. Eliminated hardcoded strings in UnsupportedFileScreen and SettingsScreen. Touched: FileRouter.kt, FileUtils.kt, TextViewerViewModel.kt, TextViewerScreen.kt, CodeViewerViewModel.kt, CodeViewerScreen.kt, PdfViewerViewModel.kt, PdfViewerScreen.kt, DocxViewerViewModel.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, SettingsScreen.kt, AppDatabase.kt, SettingsManager.kt, Color.kt, Theme.kt, Dimens.kt, strings.xml, PROJECT_CONTEXT.txt.
-110: - 2026-10-14: Completed UI Redesign Step (UI ONLY): Rebranded visible app name to "OpenView" across strings.xml, metadata.json, settings.gradle.kts, top bars, About screen, README.md, LICENSES.md, CHANGELOG.md, and PROJECT_CONTEXT.txt. Upgraded theme in Color.kt, Theme.kt, Dimens.kt with Modern Blue (#1D63ED), neutral dark gray surfaces, 56dp touch targets, format badge color coding. Renamed FolioTheme -> OpenViewTheme and FolioTopAppBar -> OpenViewTopAppBar.
-111: - 2026-10-14: Stage A confirmed working on physical device. Formulated Stage B Format 1 (TXT Viewer) proposal covering chunked/indexed streaming, non-blocking search, BOM/charset fallback, and pinch-to-zoom scaling.
-112: - 2026-10-14: Implemented Stage A (Diagnose + Logging + Pipeline). Separated Manifest VIEW intent filters, added cold-start and onNewIntent handling in MainActivity, created OpenFileSession with persistable URI permission and OpenableColumns reading, added 3-tier FileRouter detection (MIME/ext/magic bytes), added sealed UiStates (Loading/Content/Error) and ViewerErrorView, and instrumented tag:FileOpen logging.
-113: - 2026-10-14: Fixed Problem 1 (Theme) with strict two-color black/white design, zero shadows, 1dp outlines, dynamic color disabled, and persistent theme switching in MainActivity.
+103: 103. TODO / NEXT STEPS
+104: - Deploy website/ to Vercel with Root Directory set to "website".
+105: - Physical device testing with sample PDF and DOCX files of varying complexity.
+106: - Verification of memory footprint under continuous rapid zooming on lower-RAM devices.
+107: 
+108: 9. KNOWN BUGS AND LIMITATIONS
+109: - PDF page bitmaps are capped to a max render width of 4096px to protect low-RAM devices from OutOfMemoryError. If allocation fails, the viewer catches the error and lowers the zoom cap rather than crashing.
+110: 
+111: 10. CHANGE LOG
+112: - 2026-10-15: Fixed DOCX opening issue. Replaced unsafe `parser.nextText()` with safe XML text reader in `DocxViewerViewModel` and normalized ZIP entry path matching (`trim().lowercase().replace('\\', '/')`) in `FileRouter` and `DocxViewerViewModel`. Added `FileOpen` logs for URI, file name, size, checked ZIP entries, and parsed elements. Touched: app/src/main/java/io/github/hiharis/openview/viewers/docx/DocxViewerViewModel.kt, app/src/main/java/io/github/hiharis/openview/viewers/router/FileRouter.kt, PROJECT_CONTEXT.txt.
+113: - 2026-10-15: Added static download website in website/ containing exclusively website/index.html and website/style.css. Clean, accessible layout for non-technical users with 20px base font, 76px button, install steps, FAQ, light/dark mode CSS variables, and zero external network calls. Touched: website/index.html, website/style.css, PROJECT_CONTEXT.txt.
+114: - 2026-10-15: Fixed zoom and scroll gesture conflict across viewers. Replaced detectTransformGestures and graphicsLayer list scaling with shared pinchZoom modifier and width-based PDF zoom. Handled native vertical and horizontal scrolling, focal point scroll adjustments, debounced 300ms page re-rendering up to 4096px with OOM catch, and reflow zoom for DOCX/TXT/CODE viewers. Touched: app/src/main/java/io/github/hiharis/openview/ui/components/PinchZoom.kt, app/src/main/java/io/github/hiharis/openview/viewers/pdf/PdfViewerScreen.kt, app/src/main/java/io/github/hiharis/openview/viewers/pdf/PdfViewerViewModel.kt, PROJECT_CONTEXT.txt.
+115: - 2026-10-14: Implemented Stage B (Format Viewers in one pass): Built FileRouter 5-tier precision router, TextViewerViewModel/Screen with streaming & search, CodeViewerViewModel/Screen with gutter & syntax highlighting, PdfViewerViewModel/Screen with PdfRenderer & LRU cache, and DocxViewerViewModel/Screen with ZipInputStream/XmlPullParser. Eliminated hardcoded strings in UnsupportedFileScreen and SettingsScreen. Touched: FileRouter.kt, FileUtils.kt, TextViewerViewModel.kt, TextViewerScreen.kt, CodeViewerViewModel.kt, CodeViewerScreen.kt, PdfViewerViewModel.kt, PdfViewerScreen.kt, DocxViewerViewModel.kt, DocxViewerScreen.kt, UnsupportedFileScreen.kt, SettingsScreen.kt, AppDatabase.kt, SettingsManager.kt, Color.kt, Theme.kt, Dimens.kt, strings.xml, PROJECT_CONTEXT.txt.
+116: - 2026-10-14: Completed UI Redesign Step (UI ONLY): Rebranded visible app name to "OpenView" across strings.xml, metadata.json, settings.gradle.kts, top bars, About screen, README.md, LICENSES.md, CHANGELOG.md, and PROJECT_CONTEXT.txt. Upgraded theme in Color.kt, Theme.kt, Dimens.kt with Modern Blue (#1D63ED), neutral dark gray surfaces, 56dp touch targets, format badge color coding. Renamed FolioTheme -> OpenViewTheme and FolioTopAppBar -> OpenViewTopAppBar.
+117: - 2026-10-14: Stage A confirmed working on physical device. Formulated Stage B Format 1 (TXT Viewer) proposal covering chunked/indexed streaming, non-blocking search, BOM/charset fallback, and pinch-to-zoom scaling.
+118: - 2026-10-14: Implemented Stage A (Diagnose + Logging + Pipeline). Separated Manifest VIEW intent filters, added cold-start and onNewIntent handling in MainActivity, created OpenFileSession with persistable URI permission and OpenableColumns reading, added 3-tier FileRouter detection (MIME/ext/magic bytes), added sealed UiStates (Loading/Content/Error) and ViewerErrorView, and instrumented tag:FileOpen logging.
+119: - 2026-10-14: Fixed Problem 1 (Theme) with strict two-color black/white design, zero shadows, 1dp outlines, dynamic color disabled, and persistent theme switching in MainActivity.

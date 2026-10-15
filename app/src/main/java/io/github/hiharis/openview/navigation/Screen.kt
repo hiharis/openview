@@ -9,5 +9,6 @@ sealed class Screen(val route: String) {
   object CodeViewer : Screen("viewer_code")
   object PdfViewer : Screen("viewer_pdf")
   object DocxViewer : Screen("viewer_docx")
+  object ImageViewer : Screen("viewer_image")
   object Unsupported : Screen("viewer_unsupported")
 }

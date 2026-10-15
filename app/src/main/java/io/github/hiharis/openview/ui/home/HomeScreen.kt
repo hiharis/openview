@@ -205,6 +205,7 @@ fun HomeScreen(
             openDocumentLauncher.launch(
               arrayOf(
                 "application/pdf",
+                "image/*",
                 "text/*",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 "application/msword",

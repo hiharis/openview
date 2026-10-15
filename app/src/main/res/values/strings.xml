@@ -83,6 +83,14 @@
     <string name="about_lib_coroutines_name">Kotlin Coroutines</string>
     <string name="about_lib_coroutines_license">Apache License 2.0</string>
 
+    <!-- Support & Follow -->
+    <string name="about_support_title">Support OpenView</string>
+    <string name="about_support_body">OpenView is free and always will be. No money, nothing else. If it helps you, a follow is all I ask. Thank you!</string>
+    <string name="about_follow_github_label">Follow @hiharis on GitHub</string>
+    <string name="about_follow_github_url">https://github.com/hiharis</string>
+    <string name="about_follow_instagram_label">Follow @debug.life.with.haris on Instagram</string>
+    <string name="about_follow_instagram_url">https://www.instagram.com/debug.life.with.haris/</string>
+
     <!-- Generic actions & accessibility -->
     <string name="action_open">Open file</string>
     <string name="action_close">Close</string>
@@ -95,6 +103,7 @@
     <string name="viewer_title_code">Code Viewer</string>
     <string name="viewer_title_pdf">PDF Viewer</string>
     <string name="viewer_title_docx">Word Viewer</string>
+    <string name="viewer_title_image">Image Viewer</string>
 
     <!-- Viewer States & Actions -->
     <string name="viewer_empty_file">This file is empty.</string>
@@ -102,6 +111,7 @@
     <string name="viewer_error_pdf_password">Password-protected PDFs are not supported yet.</string>
     <string name="viewer_error_pdf_invalid">The PDF file is corrupted or cannot be rendered.</string>
     <string name="viewer_error_docx_invalid">This file does not appear to be a valid Word document.</string>
+    <string name="viewer_error_image_invalid">Failed to decode or render image.</string>
 
     <!-- Search in File -->
     <string name="action_search">Find in file</string>
