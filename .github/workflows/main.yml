@@ -1,24 +1,65 @@
-name: Build APK
+name: Build APK and Release
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (example: v1.0.1)'
+        description: "Version tag (example: v1.0.0)"
         required: true
-        default: 'v1.0.0'
+        default: "v1.0.0"
+
 permissions:
   contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check version format
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must look like v1.0.0"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-      - run: chmod +x gradlew && ./gradlew assembleDebug
-      - uses: softprops/action-gh-release@v2
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Build APK
+        run: |
+          if [ -f gradlew ]; then
+            chmod +x gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          else
+            gradle assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: Name the APK files
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -n 1)
+          cp "$APK" openview.apk
+          cp "$APK" "openview-${{ inputs.version }}.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openview-apk
+          path: openview.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.version }}
-          files: app/build/outputs/apk/debug/*.apk
+          name: OpenView ${{ inputs.version }}
+          generate_release_notes: true
+          make_latest: true
+          files: |
+            openview.apk
+            openview-${{ inputs.version }}.apk
