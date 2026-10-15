@@ -4,34 +4,45 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenView: Free Offline Document Viewer for Android</title>
-<meta name="description" content="Download OpenView, a free offline document viewer for Android. Open PDF, Word (DOCX), and text files. Free, offline, no ads, no sign-up, no tracking.">
+<meta name="description" content="Download OpenView, a free document viewer for Android. Open PDF, Word (DOCX), and text files. Free, works offline, no ads, no sign-up, no tracking.">
+<meta name="theme-color" content="#1D63ED">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
-  <h1>OpenView</h1>
-  <p class="lead">Free, offline, no ads, no sign-up, no tracking.</p>
 
-  <a class="download" href="https://github.com/hiharis/openview/releases/latest/download/openview.apk" download>Download OpenView</a>
-  <p class="note">For Android phones. Free forever.</p>
-  <div class="warn" id="notAndroid">This app is made for Android phones. Please open this page on your Android phone to download it.</div>
+  <header class="hero">
+    <h1>OpenView</h1>
+    <p class="lead">A free document viewer for Android. No ads, no sign-up, no tracking.</p>
+
+    <a class="download" href="https://github.com/hiharis/openview/releases/latest/download/openview.apk" download>Download OpenView</a>
+    <p class="note">For Android phones. Free forever.</p>
+    <div class="warn" id="notAndroid">This app is made for Android phones. Please open this page on your Android phone to download it.</div>
+  </header>
+
+  <section class="features" aria-label="Highlights">
+    <div class="feature"><strong>Works offline</strong><span>No internet needed to open your files.</span></div>
+    <div class="feature"><strong>No ads</strong><span>Never. Not now, not later.</span></div>
+    <div class="feature"><strong>No tracking</strong><span>No account, no analytics.</span></div>
+    <div class="feature"><strong>Open source</strong><span>Every line of code is public.</span></div>
+  </section>
 
   <h2>How to install</h2>
   <ol class="steps">
     <li>
-      <strong>1. Tap download</strong>
+      <strong><span class="num">1</span>Tap download</strong>
       <span>Tap the big download button above. If your phone warns you with "File might be harmful" or "Keep file?", tap <b>Download anyway</b> or <b>Keep</b>. That warning shows for all apps installed outside the Google Play Store.</span>
     </li>
     <li>
-      <strong>2. Open the file</strong>
+      <strong><span class="num">2</span>Open the file</strong>
       <span>When the download finishes, tap <b>Open</b> in the notification, or find <b>openview.apk</b> in your phone's Downloads folder.</span>
     </li>
     <li>
-      <strong>3. Allow install from this source</strong>
+      <strong><span class="num">3</span>Allow install from this source</strong>
       <span>If your phone asks for permission, tap <b>Settings</b>, turn on <b>Allow from this source</b>, and then tap the back button.</span>
     </li>
     <li>
-      <strong>4. Tap Install, then Open</strong>
+      <strong><span class="num">4</span>Tap Install, then Open</strong>
       <span>Tap <b>Install</b> on the screen. Once installed, tap <b>Open</b> to start viewing your files.</span>
     </li>
   </ol>
@@ -46,7 +57,15 @@
   <h2>Frequently asked questions</h2>
   <details>
     <summary>Is it safe?</summary>
-    <p>Yes. OpenView has zero internet permissions in Android, meaning it is technically impossible for the app to send your files or data anywhere. The complete source code is 100% public on GitHub for anyone to inspect.</p>
+    <p>Yes. OpenView does not need the internet to open your files, and it never uploads them anywhere. The only time it goes online is to check GitHub for a newer version, and that only sends a standard request for the latest release. The complete source code is public on GitHub for anyone to inspect.</p>
+  </details>
+  <details>
+    <summary>When does the app use the internet?</summary>
+    <p>Only to look for updates: when you tap <b>Check for updates</b> in Settings, and about once every 10 days when the app starts, to show a friendly reminder if a new version exists. Nothing is downloaded or installed unless you tap <b>Update now</b>, and Android asks you to confirm the install every time.</p>
+  </details>
+  <details>
+    <summary>How do updates work?</summary>
+    <p>The app checks the official OpenView releases on GitHub. If a newer version exists, you choose <b>Update now</b> or <b>Not now</b>. Updates are only accepted by Android if they are signed with the same developer key, so nobody else can send a fake update.</p>
   </details>
   <details>
     <summary>Does it cost anything?</summary>
@@ -54,11 +73,20 @@
   </details>
   <details>
     <summary>Why not on the Play Store?</summary>
-    <p>OpenView is distributed directly so you can install it instantly without needing a Google account or trackers. An F-Droid open source repository release is also being prepared.</p>
+    <p>OpenView is distributed directly so you can install it instantly without needing a Google account or trackers. Other app stores may be added in the future.</p>
   </details>
   <details>
     <summary>Download did not start?</summary>
-    <p>If the download didn't start automatically, visit the <a href="https://github.com/hiharis/openview/releases/latest">OpenView GitHub Releases page</a>, scroll down to the <b>Assets</b> section, and tap <b>openview.apk</b>.</p>
+    <p>If the download didn't start automatically, visit the <a href="https://github.com/hiharis/openview/releases/latest">OpenView GitHub Releases page</a>, scroll down to the <b>Assets</b> section, and tap <b>openview.apk</b>. If it gets stuck in one browser, try Chrome.</p>
+  </details>
+  <details>
+    <summary>I have an older version installed</summary>
+    <p>If your older version was installed before the first signed release (v1.0.2), uninstall it first, then install the new one. This only needs to be done once.</p>
+  </details>
+  <details>
+    <summary>How can I verify the file is genuine?</summary>
+    <p>Every release is signed with the developer's key. Its SHA-256 fingerprint is:</p>
+    <p class="fingerprint">22:A3:A0:B9:71:2A:3A:B0:C1:55:00:35:5B:1C:E5:AC:FE:95:68:05:0A:04:08:EF:32:54:4C:0A:89:51:AE:65</p>
   </details>
 
   <footer>
