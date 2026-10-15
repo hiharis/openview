@@ -27,6 +27,28 @@ val TextSecondaryDark = Color(0xFFA6ADBB)
 val OutlineDark = Color(0xFF2D323E)
 val OutlineVariantDark = Color(0xFF383E4D)
 
+// Red & White Mode: Vibrant Crimson Red (#D32F2F) with pure white surfaces
+val AccentRed = Color(0xFFD32F2F)
+val AccentRedLight = Color(0xFFFFEBEE)
+val BackgroundRed = Color(0xFFFFFFFF)
+val SurfaceRed = Color(0xFFFFFFFF)
+val SurfaceVariantRed = Color(0xFFFBF4F4)
+val TextPrimaryRed = Color(0xFF1F1F1F)
+val TextSecondaryRed = Color(0xFF6E5656)
+val OutlineRed = Color(0xFFE8D4D4)
+val OutlineVariantRed = Color(0xFFF3E7E7)
+
+// Forest Mode: Calming Emerald (#10B981) with deep pine dark background
+val AccentForest = Color(0xFF10B981)
+val AccentForestContainer = Color(0xFF064E3B)
+val BackgroundForest = Color(0xFF0D1914)
+val SurfaceForest = Color(0xFF15261F)
+val SurfaceVariantForest = Color(0xFF1D352B)
+val TextPrimaryForest = Color(0xFFE2F1EB)
+val TextSecondaryForest = Color(0xFFA3C2B5)
+val OutlineForest = Color(0xFF264538)
+val OutlineVariantForest = Color(0xFF315848)
+
 // Per-file-type colors: PDF (Red), Word (Blue), Text (Green), Code (Purple)
 val FileTypePdfLight = Color(0xFFD32F2F)
 val FileTypePdfDark = Color(0xFFEF5350)

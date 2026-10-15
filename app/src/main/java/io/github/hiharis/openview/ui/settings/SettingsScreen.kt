@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +40,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import io.github.hiharis.openview.data.settings.SettingsManager
+import io.github.hiharis.openview.data.update.UpdateCheckResult
+import io.github.hiharis.openview.data.update.UpdateDialog
+import io.github.hiharis.openview.data.update.UpdateInfo
+import io.github.hiharis.openview.data.update.UpdateManager
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,11 +66,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.hiharis.openview.R
 import io.github.hiharis.openview.ui.components.OpenViewTopAppBar
 import io.github.hiharis.openview.ui.components.SettingsRow
+import io.github.hiharis.openview.ui.theme.AccentBlue
+import io.github.hiharis.openview.ui.theme.AccentForest
+import io.github.hiharis.openview.ui.theme.AccentRed
 import io.github.hiharis.openview.ui.theme.BackgroundLight
 import io.github.hiharis.openview.ui.theme.Dimens
 import io.github.hiharis.openview.ui.theme.SurfaceDark
+import io.github.hiharis.openview.ui.theme.SurfaceForest
+import io.github.hiharis.openview.ui.theme.SurfaceRed
 import io.github.hiharis.openview.ui.theme.TextPrimaryDark
+import io.github.hiharis.openview.ui.theme.TextPrimaryForest
 import io.github.hiharis.openview.ui.theme.TextPrimaryLight
+import io.github.hiharis.openview.ui.theme.TextPrimaryRed
 import io.github.hiharis.openview.ui.theme.Transparent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +89,23 @@ fun SettingsScreen(
   viewModel: SettingsViewModel = viewModel(),
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val context = LocalContext.current
+  val coroutineScope = rememberCoroutineScope()
+  val settingsManager = remember { SettingsManager(context.applicationContext) }
+  val currentVersionName = remember { UpdateManager.getInstalledVersionName(context) }
+
+  var isCheckingUpdates by remember { mutableStateOf(false) }
+  var updateCheckMessage by remember { mutableStateOf<String?>(null) }
+  var availableUpdateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
+
+  availableUpdateInfo?.let { info ->
+    UpdateDialog(
+      info = info,
+      onDismiss = {
+        availableUpdateInfo = null
+      },
+    )
+  }
 
   Scaffold(
     topBar = {
@@ -115,34 +151,55 @@ fun SettingsScreen(
               )
               Spacer(modifier = Modifier.height(Dimens.spaceMedium))
 
-              Row(
+              Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall),
+                verticalArrangement = Arrangement.spacedBy(Dimens.spaceSmall),
               ) {
-                ThemePreviewCard(
-                  title = stringResource(id = R.string.settings_theme_system),
-                  isSelected = uiState.themeMode == AppThemeMode.SYSTEM,
-                  onClick = { viewModel.setThemeMode(AppThemeMode.SYSTEM) },
-                  previewBgColor = MaterialTheme.colorScheme.surfaceVariant,
-                  previewTextColor = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.weight(1f).testTag("theme_card_system"),
-                )
-                ThemePreviewCard(
-                  title = stringResource(id = R.string.settings_theme_light),
-                  isSelected = uiState.themeMode == AppThemeMode.LIGHT,
-                  onClick = { viewModel.setThemeMode(AppThemeMode.LIGHT) },
-                  previewBgColor = BackgroundLight,
-                  previewTextColor = TextPrimaryLight,
-                  modifier = Modifier.weight(1f).testTag("theme_card_light"),
-                )
-                ThemePreviewCard(
-                  title = stringResource(id = R.string.settings_theme_dark),
-                  isSelected = uiState.themeMode == AppThemeMode.DARK,
-                  onClick = { viewModel.setThemeMode(AppThemeMode.DARK) },
-                  previewBgColor = SurfaceDark,
-                  previewTextColor = TextPrimaryDark,
-                  modifier = Modifier.weight(1f).testTag("theme_card_dark"),
-                )
+                // Row 1: Light & Dark
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall),
+                ) {
+                  ThemePreviewCard(
+                    title = stringResource(id = R.string.settings_theme_light),
+                    isSelected = uiState.themeMode == AppThemeMode.LIGHT,
+                    onClick = { viewModel.setThemeMode(AppThemeMode.LIGHT) },
+                    previewBgColor = BackgroundLight,
+                    previewTextColor = TextPrimaryLight,
+                    modifier = Modifier.weight(1f).testTag("theme_card_light"),
+                  )
+                  ThemePreviewCard(
+                    title = stringResource(id = R.string.settings_theme_dark),
+                    isSelected = uiState.themeMode == AppThemeMode.DARK,
+                    onClick = { viewModel.setThemeMode(AppThemeMode.DARK) },
+                    previewBgColor = SurfaceDark,
+                    previewTextColor = TextPrimaryDark,
+                    modifier = Modifier.weight(1f).testTag("theme_card_dark"),
+                  )
+                }
+
+                // Row 2: Red & White and Forest
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.spacedBy(Dimens.spaceSmall),
+                ) {
+                  ThemePreviewCard(
+                    title = stringResource(id = R.string.settings_theme_red),
+                    isSelected = uiState.themeMode == AppThemeMode.RED,
+                    onClick = { viewModel.setThemeMode(AppThemeMode.RED) },
+                    previewBgColor = SurfaceRed,
+                    previewTextColor = AccentRed,
+                    modifier = Modifier.weight(1f).testTag("theme_card_red"),
+                  )
+                  ThemePreviewCard(
+                    title = stringResource(id = R.string.settings_theme_forest),
+                    isSelected = uiState.themeMode == AppThemeMode.FOREST,
+                    onClick = { viewModel.setThemeMode(AppThemeMode.FOREST) },
+                    previewBgColor = SurfaceForest,
+                    previewTextColor = AccentForest,
+                    modifier = Modifier.weight(1f).testTag("theme_card_forest"),
+                  )
+                }
               }
             }
           }
@@ -292,7 +349,56 @@ fun SettingsScreen(
           }
         }
 
-        // 3. ABOUT SECTION & SHORT PRIVACY CARD
+        // 3. UPDATES SECTION
+        item {
+          SectionHeader(title = stringResource(id = R.string.settings_section_updates))
+          Spacer(modifier = Modifier.height(Dimens.spaceSmall))
+          Card(
+            shape = RoundedCornerShape(Dimens.cornerExtraLarge),
+            border = BorderStroke(Dimens.borderThin, MaterialTheme.colorScheme.outline),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationLow),
+          ) {
+            Column(modifier = Modifier.padding(Dimens.spaceSmall)) {
+              SettingsRow(
+                title = stringResource(id = R.string.settings_check_updates_title),
+                description = when {
+                  isCheckingUpdates -> stringResource(id = R.string.update_status_checking)
+                  updateCheckMessage != null -> updateCheckMessage!!
+                  else -> stringResource(id = R.string.settings_check_updates_desc, currentVersionName)
+                },
+                icon = Icons.Default.Refresh,
+                showChevron = false,
+                onClick = {
+                  if (!isCheckingUpdates) {
+                    isCheckingUpdates = true
+                    updateCheckMessage = null
+                    coroutineScope.launch {
+                      val result = UpdateManager.checkForUpdates(currentVersionName)
+                      isCheckingUpdates = false
+                      when (result) {
+                        is UpdateCheckResult.UpdateAvailable -> {
+                          settingsManager.saveLastUpdateCheckMillis(System.currentTimeMillis())
+                          availableUpdateInfo = result.info
+                        }
+                        is UpdateCheckResult.UpToDate -> {
+                          settingsManager.saveLastUpdateCheckMillis(System.currentTimeMillis())
+                          updateCheckMessage = context.getString(R.string.update_status_up_to_date)
+                        }
+                        is UpdateCheckResult.Error -> {
+                          // Do NOT save lastUpdateCheck on error
+                          updateCheckMessage = result.message
+                        }
+                      }
+                    }
+                  }
+                },
+              )
+            }
+          }
+        }
+
+        // 4. ABOUT SECTION & SHORT PRIVACY CARD
         item {
           SectionHeader(title = stringResource(id = R.string.settings_section_about))
           Spacer(modifier = Modifier.height(Dimens.spaceSmall))

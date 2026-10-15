@@ -12,9 +12,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 enum class AppThemeMode {
-  SYSTEM,
   LIGHT,
   DARK,
+  RED,
+  FOREST,
 }
 
 enum class FontSizePreference(val title: String, val sizeSp: Int) {
@@ -24,7 +25,7 @@ enum class FontSizePreference(val title: String, val sizeSp: Int) {
 }
 
 data class SettingsUiState(
-  val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+  val themeMode: AppThemeMode = AppThemeMode.DARK,
   val fontSize: FontSizePreference = FontSizePreference.MEDIUM,
 )
 
@@ -38,7 +39,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val mode = try {
       AppThemeMode.valueOf(themeStr)
     } catch (_: Exception) {
-      AppThemeMode.SYSTEM
+      if (themeStr == "LIGHT") AppThemeMode.LIGHT else AppThemeMode.DARK
     }
     val fontSize = FontSizePreference.values().find { it.sizeSp == fontSp } ?: FontSizePreference.MEDIUM
     SettingsUiState(themeMode = mode, fontSize = fontSize)

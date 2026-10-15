@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -62,6 +63,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.window.Dialog
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.hiharis.openview.R
@@ -221,13 +223,28 @@ fun PdfViewerScreen(
             val viewportHeightDp = maxHeight - Dimens.spaceMedium
             val hScrollState = rememberScrollState()
             var zoomScale by remember { mutableFloatStateOf(1.0f) }
+            var panFraction by remember { mutableFloatStateOf(0.5f) }
 
             val isZoomed = zoomScale > 1.0f
             val contentWidth = if (isZoomed) viewportWidth * zoomScale else viewportWidth
 
+            // Keep panFraction in sync with manual user horizontal scroll when zoomed
+            LaunchedEffect(hScrollState.value, hScrollState.maxValue) {
+              if (hScrollState.maxValue > 0) {
+                panFraction = (hScrollState.value.toFloat() / hScrollState.maxValue).coerceIn(0f, 1f)
+              }
+            }
+
             LaunchedEffect(zoomScale) {
               if (zoomScale <= 1.0f) {
                 hScrollState.scrollTo(0)
+                panFraction = 0.5f
+              } else {
+                val maxScroll = (screenWidthPx * (zoomScale - 1f)).roundToInt()
+                if (maxScroll > 0) {
+                  val targetScroll = (maxScroll * panFraction).roundToInt().coerceIn(0, maxScroll)
+                  hScrollState.scrollTo(targetScroll)
+                }
               }
             }
 
@@ -239,11 +256,41 @@ fun PdfViewerScreen(
                   enabled = isZoomed,
                 )
                 .pinchZoom(
-                  onZoom = { zoomChange, _ ->
-                    zoomScale = (zoomScale * zoomChange).coerceIn(1.0f, 4.0f)
+                  onZoom = { zoomChange, centroid ->
+                    val oldScale = zoomScale
+                    val newScale = (zoomScale * zoomChange).coerceIn(1.0f, 4.0f)
+                    if (newScale != oldScale) {
+                      // When beginning zoom from 1.0x, anchor to pinch focal point or center
+                      if (oldScale <= 1.01f) {
+                        val focalX = if (centroid.x.isFinite() && centroid.x > 0f) centroid.x else screenWidthPx / 2f
+                        panFraction = (focalX / screenWidthPx.toFloat()).coerceIn(0.2f, 0.8f)
+                      }
+                      zoomScale = newScale
+                      val maxScroll = screenWidthPx * (newScale - 1f)
+                      if (maxScroll > 0f) {
+                        val targetScroll = (maxScroll * panFraction).roundToInt().coerceIn(0, maxScroll.roundToInt())
+                        coroutineScope.launch {
+                          hScrollState.scrollTo(targetScroll)
+                        }
+                      }
+                    }
                   },
                   onDoubleTap = {
-                    zoomScale = if (zoomScale < 1.5f) 2.0f else 1.0f
+                    if (zoomScale < 1.5f) {
+                      panFraction = 0.5f
+                      val targetScale = 2.0f
+                      zoomScale = targetScale
+                      coroutineScope.launch {
+                        val maxScroll = (screenWidthPx * (targetScale - 1f)).roundToInt()
+                        hScrollState.animateScrollTo(maxScroll / 2)
+                      }
+                    } else {
+                      zoomScale = 1.0f
+                      panFraction = 0.5f
+                      coroutineScope.launch {
+                        hScrollState.animateScrollTo(0)
+                      }
+                    }
                   },
                 ),
             ) {
@@ -373,7 +420,7 @@ private fun PdfPageItem(
         1f / 1.414f
       }
       modifier
-        .height(viewportHeightDp)
+        .height(viewportHeightDp * zoomScale)
         .aspectRatio(aspect)
         .padding(horizontal = Dimens.spaceSmall, vertical = Dimens.spaceSmall)
     }
@@ -396,6 +443,7 @@ private fun PdfPageItem(
           bitmap = bitmap.asImageBitmap(),
           contentDescription = null,
           colorFilter = colorFilter,
+          contentScale = ContentScale.FillWidth,
           modifier = Modifier.fillMaxWidth(),
         )
       } else {

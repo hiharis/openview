@@ -102,6 +102,44 @@ private val OpenViewDarkColorScheme = darkColorScheme(
   outlineVariant = OutlineVariantDark,
 )
 
+private val OpenViewRedColorScheme = lightColorScheme(
+  primary = AccentRed,
+  onPrimary = Color.White,
+  primaryContainer = AccentRedLight,
+  onPrimaryContainer = Color(0xFFB71C1C),
+  secondary = AccentRed,
+  onSecondary = Color.White,
+  secondaryContainer = AccentRedLight,
+  onSecondaryContainer = Color(0xFFB71C1C),
+  background = BackgroundRed,
+  onBackground = TextPrimaryRed,
+  surface = SurfaceRed,
+  onSurface = TextPrimaryRed,
+  surfaceVariant = SurfaceVariantRed,
+  onSurfaceVariant = TextSecondaryRed,
+  outline = OutlineRed,
+  outlineVariant = OutlineVariantRed,
+)
+
+private val OpenViewForestColorScheme = darkColorScheme(
+  primary = AccentForest,
+  onPrimary = Color(0xFF022C22),
+  primaryContainer = AccentForestContainer,
+  onPrimaryContainer = Color(0xFFA7F3D0),
+  secondary = Color(0xFF34D399),
+  onSecondary = Color(0xFF022C22),
+  secondaryContainer = Color(0xFF065F46),
+  onSecondaryContainer = Color(0xFFD1FAE5),
+  background = BackgroundForest,
+  onBackground = TextPrimaryForest,
+  surface = SurfaceForest,
+  onSurface = TextPrimaryForest,
+  surfaceVariant = SurfaceVariantForest,
+  onSurfaceVariant = TextSecondaryForest,
+  outline = OutlineForest,
+  outlineVariant = OutlineVariantForest,
+)
+
 private val OpenViewShapes = Shapes(
   small = RoundedCornerShape(Dimens.cornerSmall),
   medium = RoundedCornerShape(Dimens.cornerMedium),
@@ -121,12 +159,27 @@ object OpenViewTheme {
 
 @Composable
 fun OpenViewTheme(
+  themeMode: io.github.hiharis.openview.ui.settings.AppThemeMode? = null,
   darkTheme: Boolean = isSystemInDarkTheme(),
   content: @Composable () -> Unit,
 ) {
-  val colorScheme: ColorScheme = if (darkTheme) OpenViewDarkColorScheme else OpenViewLightColorScheme
+  val activeMode = themeMode ?: if (darkTheme) {
+    io.github.hiharis.openview.ui.settings.AppThemeMode.DARK
+  } else {
+    io.github.hiharis.openview.ui.settings.AppThemeMode.LIGHT
+  }
 
-  val fileTypeColors = if (darkTheme) {
+  val colorScheme: ColorScheme = when (activeMode) {
+    io.github.hiharis.openview.ui.settings.AppThemeMode.LIGHT -> OpenViewLightColorScheme
+    io.github.hiharis.openview.ui.settings.AppThemeMode.DARK -> OpenViewDarkColorScheme
+    io.github.hiharis.openview.ui.settings.AppThemeMode.RED -> OpenViewRedColorScheme
+    io.github.hiharis.openview.ui.settings.AppThemeMode.FOREST -> OpenViewForestColorScheme
+  }
+
+  val isDarkSurface = activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.DARK ||
+    activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.FOREST
+
+  val fileTypeColors = if (isDarkSurface) {
     FileTypeColors(
       pdf = FileTypePdfDark,
       pdfContainer = FileTypePdfContainerDark,
@@ -150,14 +203,14 @@ fun OpenViewTheme(
     )
   }
 
-  val syntaxColors = if (darkTheme) {
+  val syntaxColors = if (isDarkSurface) {
     SyntaxColors(
       keyword = SyntaxKeywordDark,
       string = SyntaxStringDark,
       comment = SyntaxCommentDark,
       number = SyntaxNumberDark,
-      gutterBackground = GutterBackgroundDark,
-      gutterText = GutterTextDark,
+      gutterBackground = if (activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.FOREST) SurfaceForest else GutterBackgroundDark,
+      gutterText = if (activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.FOREST) TextSecondaryForest else GutterTextDark,
       searchHighlight = SearchHighlightDark,
       searchHighlightCurrent = SearchHighlightCurrentDark,
     )
@@ -167,8 +220,8 @@ fun OpenViewTheme(
       string = SyntaxStringLight,
       comment = SyntaxCommentLight,
       number = SyntaxNumberLight,
-      gutterBackground = GutterBackgroundLight,
-      gutterText = GutterTextLight,
+      gutterBackground = if (activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.RED) SurfaceVariantRed else GutterBackgroundLight,
+      gutterText = if (activeMode == io.github.hiharis.openview.ui.settings.AppThemeMode.RED) TextSecondaryRed else GutterTextLight,
       searchHighlight = SearchHighlightLight,
       searchHighlightCurrent = SearchHighlightCurrentLight,
     )

@@ -44,6 +44,8 @@
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_red">Red &amp; White</string>
+    <string name="settings_theme_forest">Forest</string>
     <string name="settings_section_reading">Reading</string>
     <string name="settings_font_size_title">Text size</string>
     <string name="settings_font_size_desc">Used for plain text and source code readers</string>
@@ -52,8 +54,8 @@
     <string name="settings_section_about">About &amp; Privacy</string>
     <string name="settings_about_app_title">About OpenView</string>
     <string name="settings_about_app_desc">Version, open source licenses, and mission</string>
-    <string name="settings_privacy_badge_title">100% Offline &amp; Private</string>
-    <string name="settings_privacy_badge_desc">No internet permission, no ads, no trackers, no accounts.</string>
+    <string name="settings_privacy_badge_title">Private &amp; Offline Reading</string>
+    <string name="settings_privacy_badge_desc">Internet is only used to check for app updates. No ads, no trackers, no accounts.</string>
 
     <!-- About Screen -->
     <string name="about_title">About</string>
@@ -167,5 +169,25 @@
     <string name="home_storage_permission_title">Show documents from your device</string>
     <string name="home_storage_permission_desc">Grant storage access to see documents in your Download and Documents folders here.</string>
     <string name="home_storage_permission_button">Grant access</string>
-    <string name="about_permission_notice">OpenView uses storage access solely to discover and open documents in your Download and Documents folders. It has zero internet permission, zero tracking, and zero ads.</string>
+    <string name="about_permission_notice">OpenView uses storage access solely to discover and open documents in your Download and Documents folders. Internet access is used only when checking for and downloading app updates. Zero ads, zero tracking, zero analytics, and zero accounts.</string>
+
+    <!-- App Update Feature -->
+    <string name="settings_section_updates">Updates</string>
+    <string name="settings_check_updates_title">Check for updates</string>
+    <string name="settings_check_updates_desc">Current version: %1$s</string>
+    <string name="update_dialog_title">Update Available</string>
+    <string name="update_dialog_message">Hello! Just a tiny heads-up that a newer version of the app is available. I work really hard on my own to keep making things better, faster, and smoother for you. It would mean the world to me if you grabbed the latest update! But if you\'d rather wait, no worries at all. Keep enjoying the app exactly as it is. Thanks for sticking with me!</string>
+    <string name="update_button_update_now">Update now</string>
+    <string name="update_button_not_now">Not now</string>
+    <string name="update_status_checking">Checking for updates…</string>
+    <string name="update_status_up_to_date">You\'re up to date</string>
+    <string name="update_status_downloading">Downloading update… %1$d%%</string>
+    <string name="update_status_verifying">Verifying package integrity…</string>
+    <string name="update_error_network">Unable to connect to GitHub. Check your internet connection.</string>
+    <string name="update_error_no_apk">No valid release APK found.</string>
+    <string name="update_error_digest_mismatch">Checksum verification failed. The update file was deleted for security.</string>
+    <string name="update_error_download_failed">Failed to download update.</string>
+    <string name="update_permission_required">OpenView needs permission to install app updates. Please enable \'Install unknown apps\' in Settings.</string>
+    <string name="update_button_settings">Open Settings</string>
+    <string name="update_button_cancel">Cancel</string>
 </resources>

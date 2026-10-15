@@ -48,16 +48,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -231,7 +237,27 @@ fun CodeViewerScreen(
               }
 
               val horizontalScrollState = rememberScrollState()
-              val lineCountDigits = state.totalLines.toString().length.coerceAtLeast(2)
+              val density = LocalDensity.current
+              val textMeasurer = rememberTextMeasurer()
+              val totalLinesCount = maxOf(state.lines.size, state.totalLines, 1)
+              val lineCountDigits = totalLinesCount.toString().length.coerceAtLeast(2)
+              val gutterFontSizeSp = (effectiveFontSizeSp * 0.85f).sp
+              val sampleNumberText = remember(lineCountDigits) { "9".repeat(lineCountDigits) }
+
+              val gutterWidth = remember(lineCountDigits, gutterFontSizeSp, density) {
+                val measuredWidthPx = textMeasurer.measure(
+                  text = sampleNumberText,
+                  style = TextStyle(
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = gutterFontSizeSp,
+                    fontWeight = FontWeight.Normal,
+                  ),
+                ).size.width
+                with(density) {
+                  // Text width plus 6dp left padding and 6dp right padding (minimum 24dp)
+                  (measuredWidthPx.toDp() + 12.dp).coerceAtLeast(24.dp)
+                }
+              }
 
               Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
@@ -252,31 +278,35 @@ fun CodeViewerScreen(
                       modifier = Modifier.fillMaxWidth(),
                       verticalAlignment = Alignment.Top,
                     ) {
-                      // Line number gutter
+                      // Dynamic line number gutter with continuous vertical divider
+                      val dividerColor = MaterialTheme.colorScheme.outlineVariant
+                      val dividerThickness = Dimens.dividerThickness
                       Box(
                         modifier = Modifier
-                          .width(Dimens.codeGutterWidth + (lineCountDigits * 4).sp.value.toInt().coerceAtLeast(0).let { Dimens.spaceSmall })
+                          .width(gutterWidth)
                           .background(syntaxColors.gutterBackground)
-                          .padding(horizontal = Dimens.codeGutterPadding, vertical = Dimens.spaceNone),
+                          .drawBehind {
+                            val strokeWidthPx = dividerThickness.toPx()
+                            val x = size.width - strokeWidthPx / 2f
+                            drawLine(
+                              color = dividerColor,
+                              start = Offset(x, 0f),
+                              end = Offset(x, size.height),
+                              strokeWidth = strokeWidthPx,
+                            )
+                          }
+                          .padding(start = 4.dp, end = 6.dp),
                         contentAlignment = Alignment.TopEnd,
                       ) {
                         Text(
                           text = (lineIndex + 1).toString(),
                           fontFamily = FontFamily.Monospace,
-                          fontSize = (effectiveFontSizeSp * 0.85f).sp,
+                          fontSize = gutterFontSizeSp,
                           lineHeight = (effectiveFontSizeSp * 1.4f).sp,
                           color = syntaxColors.gutterText,
                           textAlign = TextAlign.End,
                         )
                       }
-
-                      // Vertical Divider
-                      Box(
-                        modifier = Modifier
-                          .width(Dimens.dividerThickness)
-                          .height((effectiveFontSizeSp * 1.4f).sp.value.toInt().coerceAtLeast(20).let { Dimens.codeLineHeight })
-                          .background(MaterialTheme.colorScheme.outlineVariant),
-                      )
 
                       // Code Line Text
                       val lineModifier = if (state.wordWrap) {
